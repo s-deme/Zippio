@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Zippio</string>
+    <string name="title">Zippio</string>
+    <string name="subtitle">広告なし。端末内で圧縮・解凍。</string>
+    <string name="supported_formats">圧縮: ZIP / 7z　　解凍: ZIP / 7z / RAR</string>
+    <string name="archive_format">圧縮形式</string>
+    <string name="password_hint">パスワード（必要な場合のみ）</string>
+    <string name="show_password">表示</string>
+    <string name="password_note">ZIP・7z・RAR の暗号化アーカイブに対応</string>
+    <string name="compress">フォルダを圧縮する</string>
+    <string name="extract">アーカイブを解凍する</string>
+    <string name="idle">操作を選んでください</string>
+    <string name="workflow_note">解凍前に、形式・ファイル数・展開後の容量を確認できます。ファイル管理アプリの「共有」からアーカイブを直接開くこともできます。</string>
+    <string name="archive_received">アーカイブを受け取りました。必要ならパスワードを入力し、「アーカイブを解凍する」を押してください。</string>
+    <string name="archive_preview_title">解凍前の確認</string>
+    <string name="archive_preview_template">%1$s\n\n形式: %2$s\n項目: %3$d 件（ファイル %4$d 件）\n展開後の目安: %5$s</string>
+    <string name="archive_preview_encrypted">暗号化アーカイブです。パスワードが正しいことを確認してから進めてください。</string>
+    <string name="archive_preview_capacity_warning">注意: ファイル数または展開後の容量が大きくなる可能性があります。空き容量を確認してから続けてください。</string>
+    <string name="choose_destination">解凍先を選ぶ</string>
+    <string name="cancel">キャンセル</string>
+    <string name="privacy_note">ファイルは端末内だけで処理され、外部へ送信されません。</string>
+</resources>

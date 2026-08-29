@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/zippio_background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/hero_background"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/title"
+                android:textColor="@color/zippio_ink"
+                android:textSize="32sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/subtitle"
+                android:textColor="@color/zippio_muted"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_background"
+            android:elevation="2dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/supported_formats"
+                android:textColor="@color/zippio_ink"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/archive_format"
+                android:textColor="@color/zippio_muted"
+                android:textSize="13sp" />
+
+            <Spinner
+                android:id="@+id/format_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:entries="@array/archive_formats" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/password_input"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:autofillHints="password"
+                    android:hint="@string/password_hint"
+                    android:inputType="textPassword"
+                    android:maxLines="1" />
+
+                <CheckBox
+                    android:id="@+id/show_password"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/show_password"
+                    android:textColor="@color/zippio_muted"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/password_note"
+                android:textColor="@color/zippio_muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/compress_button"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="18dp"
+            android:backgroundTint="@color/zippio_primary"
+            android:text="@string/compress"
+            android:textColor="#FFFFFFFF" />
+
+        <Button
+            android:id="@+id/extract_button"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="10dp"
+            android:backgroundTint="@color/zippio_accent"
+            android:text="@string/extract"
+            android:textColor="#FFFFFFFF" />
+
+        <ProgressBar
+            android:id="@+id/progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="24dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/status_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="@string/idle"
+            android:textColor="@color/zippio_ink"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:background="@drawable/card_background"
+            android:text="@string/workflow_note"
+            android:textColor="@color/zippio_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:text="@string/privacy_note"
+            android:textColor="@color/zippio_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

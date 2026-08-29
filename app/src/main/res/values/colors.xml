@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="zippio_primary">#4F46E5</color>
+    <color name="zippio_primary_dark">#3730A3</color>
+    <color name="zippio_accent">#0F766E</color>
+    <color name="zippio_background">#F8FAFC</color>
+    <color name="zippio_ink">#172033</color>
+    <color name="zippio_muted">#5C667A</color>
+    <color name="zippio_card">#FFFFFFFF</color>
+</resources>

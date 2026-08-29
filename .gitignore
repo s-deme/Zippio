@@ -1,0 +1,12 @@
+.gradle/
+.gradle-user-home/
+.tooling/
+.android-sdk/
+.android-user-home/
+.idea/
+build/
+app/build/
+local.properties
+*.iml
+*.apk
+*.aab
