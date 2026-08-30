@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="space_2xs">4dp</dimen>
+    <dimen name="space_xs">8dp</dimen>
+    <dimen name="space_sm">12dp</dimen>
+    <dimen name="space_md">16dp</dimen>
+    <dimen name="space_lg">20dp</dimen>
+    <dimen name="space_2xl">32dp</dimen>
+    <dimen name="screen_horizontal_padding">16dp</dimen>
+    <dimen name="screen_vertical_padding">16dp</dimen>
+    <dimen name="card_padding">20dp</dimen>
+    <dimen name="hero_padding">24dp</dimen>
+    <dimen name="radius_sm">12dp</dimen>
+    <dimen name="radius_md">16dp</dimen>
+    <dimen name="radius_lg">24dp</dimen>
+    <dimen name="control_height">56dp</dimen>
+    <dimen name="icon_sm">20dp</dimen>
+    <dimen name="icon_md">24dp</dimen>
+</resources>

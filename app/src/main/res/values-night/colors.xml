@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="color_primary">#C3C0FF</color>
+    <color name="color_on_primary">#252173</color>
+    <color name="color_primary_container">#39349C</color>
+    <color name="color_on_primary_container">#E4E1FF</color>
+    <color name="color_secondary">#78D8D2</color>
+    <color name="color_on_secondary">#003735</color>
+    <color name="color_secondary_container">#00504D</color>
+    <color name="color_on_secondary_container">#99F5EF</color>
+
+    <color name="color_background">#10131C</color>
+    <color name="color_surface">#181C26</color>
+    <color name="color_surface_container">#20242F</color>
+    <color name="color_surface_container_high">#292D38</color>
+    <color name="color_on_surface">#E3E2EC</color>
+    <color name="color_on_surface_variant">#C7C5D0</color>
+    <color name="color_outline">#91909A</color>
+    <color name="color_outline_variant">#454650</color>
+    <color name="color_scrim">#99000000</color>
+
+    <color name="color_error">#FFB4AB</color>
+    <color name="color_on_error">#690005</color>
+    <color name="color_warning">#FFB95F</color>
+    <color name="color_success">#8EDAAB</color>
+    <color name="color_info">#A8C8FA</color>
+    <color name="color_focus">#C3C0FF</color>
+    <color name="color_disabled_surface">#30333D</color>
+    <color name="color_disabled_content">#A9A8B2</color>
+    <color name="color_selection">#39349C</color>
+    <color name="color_pressed_on_dark">#33FFFFFF</color>
+    <color name="color_pressed_on_light">#29FFFFFF</color>
+    <color name="color_pressed_on_secondary">#3378D8D2</color>
+
+    <color name="color_hero_start">#24205F</color>
+    <color name="color_hero_end">#39349C</color>
+    <color name="color_on_hero">#F5F3FF</color>
+    <color name="color_hero_badge">#2BFFFFFF</color>
+    <color name="color_hero_badge_outline">#59FFFFFF</color>
+</resources>

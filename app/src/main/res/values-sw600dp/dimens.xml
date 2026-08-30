@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="screen_horizontal_padding">64dp</dimen>
+    <dimen name="screen_vertical_padding">24dp</dimen>
+    <dimen name="card_padding">24dp</dimen>
+    <dimen name="hero_padding">32dp</dimen>
+</resources>

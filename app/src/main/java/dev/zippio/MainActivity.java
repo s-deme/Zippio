@@ -22,6 +22,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
@@ -56,7 +57,9 @@ public final class MainActivity extends Activity {
     private final Handler mainThread = new Handler(Looper.getMainLooper());
 
     private Spinner formatSpinner;
+    private FrameLayout formatField;
     private Spinner compressionLevelSpinner;
+    private FrameLayout compressionLevelField;
     private TextView compressionLevelLabel;
     private EditText passwordInput;
     private TextView passwordStrength;
@@ -102,7 +105,9 @@ public final class MainActivity extends Activity {
         applySystemBarInsets(findViewById(R.id.root_scroll));
 
         formatSpinner = findViewById(R.id.format_spinner);
+        formatField = findViewById(R.id.format_field);
         compressionLevelSpinner = findViewById(R.id.compression_level_spinner);
+        compressionLevelField = findViewById(R.id.compression_level_field);
         compressionLevelLabel = findViewById(R.id.compression_level_label);
         passwordInput = findViewById(R.id.password_input);
         passwordStrength = findViewById(R.id.password_strength);
@@ -122,13 +127,13 @@ public final class MainActivity extends Activity {
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         formatSpinner.setAdapter(ArrayAdapter.createFromResource(
-                this, R.array.archive_formats, android.R.layout.simple_spinner_item));
+                this, R.array.archive_formats, R.layout.item_spinner_selected));
         ((ArrayAdapter<?>) formatSpinner.getAdapter()).setDropDownViewResource(
-                android.R.layout.simple_spinner_dropdown_item);
+                R.layout.item_spinner_dropdown);
         compressionLevelSpinner.setAdapter(ArrayAdapter.createFromResource(
-                this, R.array.compression_levels, android.R.layout.simple_spinner_item));
+                this, R.array.compression_levels, R.layout.item_spinner_selected));
         ((ArrayAdapter<?>) compressionLevelSpinner.getAdapter()).setDropDownViewResource(
-                android.R.layout.simple_spinner_dropdown_item);
+                R.layout.item_spinner_dropdown);
 
         restoreOptions();
         bindUi();
@@ -858,18 +863,22 @@ public final class MainActivity extends Activity {
                 String.valueOf(formatSpinner.getSelectedItem())) == ArchiveEngine.ArchiveFormat.ZIP;
         compressionLevelLabel.setText(zip
                 ? R.string.compression_level : R.string.compression_level_7z);
-        compressionLevelSpinner.setVisibility(zip ? View.VISIBLE : View.GONE);
+        compressionLevelField.setVisibility(zip ? View.VISIBLE : View.GONE);
         compressionLevelSpinner.setEnabled(zip && formatSpinner.isEnabled() && !working);
+        compressionLevelField.setEnabled(compressionLevelSpinner.isEnabled());
     }
 
     private void updatePasswordHelper() {
         int length = passwordInput.getText().length();
         if (length == 0) {
             passwordStrength.setText(R.string.password_note);
+            passwordStrength.setTextColor(getColor(R.color.color_on_surface_variant));
         } else if (length < 12) {
             passwordStrength.setText(R.string.password_strength_short);
+            passwordStrength.setTextColor(getColor(R.color.color_warning));
         } else {
             passwordStrength.setText(R.string.password_strength_good);
+            passwordStrength.setTextColor(getColor(R.color.color_success));
         }
     }
 
@@ -901,6 +910,7 @@ public final class MainActivity extends Activity {
         verifyButton.setEnabled(allowActions);
         resetButton.setEnabled(allowActions);
         formatSpinner.setEnabled(allowActions);
+        formatField.setEnabled(allowActions);
         includeRootFolder.setEnabled(allowActions);
         includeHiddenFiles.setEnabled(allowActions);
         passwordInput.setEnabled(allowActions);

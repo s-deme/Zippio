@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Zippio" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Zippio" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowBackground">@color/color_background</item>
@@ -10,11 +10,9 @@
         <item name="android:colorControlHighlight">@color/color_pressed_on_light</item>
         <item name="android:textColorPrimary">@color/color_on_surface</item>
         <item name="android:textColorSecondary">@color/color_on_surface_variant</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@color/color_background</item>
         <item name="android:windowDisablePreview">true</item>
-        <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>

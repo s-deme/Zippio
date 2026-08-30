@@ -1,16 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="zippio_primary">#3730A3</color>
-    <color name="zippio_primary_dark">#312E81</color>
-    <color name="zippio_primary_soft">#E0E7FF</color>
-    <color name="zippio_accent">#0F5C57</color>
-    <color name="zippio_accent_dark">#064E4A</color>
-    <color name="zippio_accent_soft">#CCFBF1</color>
-    <color name="zippio_background">#F5F7FB</color>
-    <color name="zippio_ink">#0F172A</color>
-    <color name="zippio_muted">#334155</color>
-    <color name="zippio_border">#AAB7C8</color>
-    <color name="zippio_disabled_surface">#DCE3EC</color>
-    <color name="zippio_disabled_ink">#26364B</color>
-    <color name="zippio_card">#FFFFFFFF</color>
+    <!-- Brand and action roles -->
+    <color name="color_primary">#4F46E5</color>
+    <color name="color_on_primary">#FFFFFF</color>
+    <color name="color_primary_container">#E7E7FF</color>
+    <color name="color_on_primary_container">#191650</color>
+    <color name="color_secondary">#006B67</color>
+    <color name="color_on_secondary">#FFFFFF</color>
+    <color name="color_secondary_container">#B8F2ED</color>
+    <color name="color_on_secondary_container">#00201F</color>
+
+    <!-- Surfaces and content roles -->
+    <color name="color_background">#F7F8FD</color>
+    <color name="color_surface">#FFFFFF</color>
+    <color name="color_surface_container">#EFF1F7</color>
+    <color name="color_surface_container_high">#E7E9F1</color>
+    <color name="color_on_surface">#191B25</color>
+    <color name="color_on_surface_variant">#4A4C5A</color>
+    <color name="color_outline">#747683</color>
+    <color name="color_outline_variant">#C6C6D0</color>
+    <color name="color_scrim">#66000000</color>
+
+    <!-- Feedback and interaction roles -->
+    <color name="color_error">#BA1A1A</color>
+    <color name="color_on_error">#FFFFFF</color>
+    <color name="color_warning">#855300</color>
+    <color name="color_success">#176B3A</color>
+    <color name="color_info">#385F92</color>
+    <color name="color_focus">#4F46E5</color>
+    <color name="color_disabled_surface">#E0E1E8</color>
+    <color name="color_disabled_content">#5F616E</color>
+    <color name="color_selection">#E7E7FF</color>
+    <color name="color_pressed_on_dark">#33FFFFFF</color>
+    <color name="color_pressed_on_light">#1F4F46E5</color>
+    <color name="color_pressed_on_secondary">#26006B67</color>
+
+    <!-- Hero-specific roles -->
+    <color name="color_hero_start">#312E81</color>
+    <color name="color_hero_end">#4F46E5</color>
+    <color name="color_on_hero">#FFFFFF</color>
+    <color name="color_hero_badge">#2BFFFFFF</color>
+    <color name="color_hero_badge_outline">#59FFFFFF</color>
+
 </resources>
