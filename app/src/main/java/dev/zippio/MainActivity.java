@@ -5,7 +5,9 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Insets;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,6 +16,7 @@ import android.text.TextWatcher;
 import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
 import android.view.View;
+import android.view.WindowInsets;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -96,6 +99,7 @@ public final class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         StorageBridge.clearStaleWork(this);
         setContentView(R.layout.activity_main);
+        applySystemBarInsets(findViewById(R.id.root_scroll));
 
         formatSpinner = findViewById(R.id.format_spinner);
         compressionLevelSpinner = findViewById(R.id.compression_level_spinner);
@@ -132,6 +136,43 @@ public final class MainActivity extends Activity {
         updatePasswordHelper();
         setUiState(false, true);
         handleIncomingArchive(getIntent());
+    }
+
+    /** Keeps all controls clear of status, navigation, gesture and display-cutout areas. */
+    private static void applySystemBarInsets(View root) {
+        final int initialLeft = root.getPaddingLeft();
+        final int initialTop = root.getPaddingTop();
+        final int initialRight = root.getPaddingRight();
+        final int initialBottom = root.getPaddingBottom();
+
+        root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            int left;
+            int top;
+            int right;
+            int bottom;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Insets safeInsets = windowInsets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                left = safeInsets.left;
+                top = safeInsets.top;
+                right = safeInsets.right;
+                bottom = safeInsets.bottom;
+            } else {
+                left = windowInsets.getSystemWindowInsetLeft();
+                top = windowInsets.getSystemWindowInsetTop();
+                right = windowInsets.getSystemWindowInsetRight();
+                bottom = windowInsets.getSystemWindowInsetBottom();
+            }
+
+            view.setPadding(
+                    initialLeft + left,
+                    initialTop + top,
+                    initialRight + right,
+                    initialBottom + bottom);
+            return windowInsets;
+        });
+        root.requestApplyInsets();
     }
 
     private void bindUi() {
