@@ -1,0 +1,135 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "platforms;android-35" "build-tools;36.0.0"
+
+      - name: Validate tag and Android version
+        shell: pwsh
+        run: ./scripts/Validate-ReleaseVersion.ps1 -Tag $env:GITHUB_REF_NAME
+
+      - name: Refuse to overwrite an existing release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $response = & gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$env:GITHUB_REF_NAME" 2>&1
+          $status = $LASTEXITCODE
+          if ($status -eq 0) {
+            throw "Release $env:GITHUB_REF_NAME already exists; refusing to overwrite it."
+          }
+          if (($response -join "`n") -notmatch '(?i)(HTTP 404|Not Found)') {
+            throw 'Unable to confirm that the release tag is unused.'
+          }
+
+      - name: Validate release signing secrets
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          $required = @(
+            'ANDROID_KEYSTORE_BASE64',
+            'ANDROID_KEYSTORE_PASSWORD',
+            'ANDROID_KEY_ALIAS',
+            'ANDROID_KEY_PASSWORD'
+          )
+          $missing = @($required | Where-Object {
+            [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+          if ($missing.Count -gt 0) {
+            throw "Missing required release secrets: $($missing -join ', ')."
+          }
+
+      - name: Restore release keystore
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/zippio-release.keystore
+        run: |
+          try {
+            $bytes = [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64)
+            [IO.File]::WriteAllBytes($env:ANDROID_KEYSTORE_PATH, $bytes)
+          } catch {
+            throw 'Unable to restore the release keystore from ANDROID_KEYSTORE_BASE64.'
+          } finally {
+            $bytes = $null
+          }
+
+      - name: Build signed release APK
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/zippio-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./build.ps1 -Mode Release -OutputDirectory dist/release
+
+      - name: Remove restored keystore
+        if: always()
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/zippio-release.keystore
+        run: Remove-Item -LiteralPath $env:ANDROID_KEYSTORE_PATH -Force -ErrorAction SilentlyContinue
+
+      - name: Verify release APK
+        shell: pwsh
+        run: |
+          $expectedVersion = $env:GITHUB_REF_NAME.Substring(1)
+          ./scripts/Verify-Apk.ps1 `
+            -ApkPath dist/release/zippio.apk `
+            -BuildToolsVersion 36.0.0 `
+            -ExpectedVersionName $expectedVersion `
+            -RejectDebugCertificate
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            dist/release/zippio.apk `
+            dist/release/zippio.apk.sha256 `
+            --repo $env:GITHUB_REPOSITORY `
+            --title "Zippio $env:GITHUB_REF_NAME" `
+            --generate-notes `
+            --latest `
+            --verify-tag

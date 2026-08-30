@@ -10,3 +10,10 @@ local.properties
 *.iml
 *.apk
 *.aab
+*.sha256
+*.keystore
+*.jks
+*.p12
+*.pem
+.release-signing/
+release-signing/
