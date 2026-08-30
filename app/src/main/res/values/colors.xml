@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="zippio_primary">#4F46E5</color>
-    <color name="zippio_primary_dark">#3730A3</color>
-    <color name="zippio_accent">#0F766E</color>
-    <color name="zippio_background">#F8FAFC</color>
-    <color name="zippio_ink">#172033</color>
-    <color name="zippio_muted">#5C667A</color>
+    <color name="zippio_primary">#3730A3</color>
+    <color name="zippio_primary_dark">#312E81</color>
+    <color name="zippio_primary_soft">#E0E7FF</color>
+    <color name="zippio_accent">#0F5C57</color>
+    <color name="zippio_accent_dark">#064E4A</color>
+    <color name="zippio_accent_soft">#CCFBF1</color>
+    <color name="zippio_background">#F5F7FB</color>
+    <color name="zippio_ink">#0F172A</color>
+    <color name="zippio_muted">#334155</color>
+    <color name="zippio_border">#AAB7C8</color>
+    <color name="zippio_disabled_surface">#DCE3EC</color>
+    <color name="zippio_disabled_ink">#26364B</color>
     <color name="zippio_card">#FFFFFFFF</color>
 </resources>

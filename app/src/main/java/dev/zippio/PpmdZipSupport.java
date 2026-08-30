@@ -15,6 +15,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Reads ZIP entries whose compression method is not implemented by zip4j, notably PPMd.
@@ -35,10 +37,14 @@ final class PpmdZipSupport {
             int files = 0;
             long uncompressedBytes = 0;
             boolean encrypted = false;
+            List<String> previewEntries = new ArrayList<>();
 
             for (int index = 0; index < entries; index++) {
                 String name = archive.input.getStringProperty(index, PropID.PATH);
                 ArchiveEngine.validateArchiveEntryName(name);
+                if (previewEntries.size() < ArchiveEngine.ArchiveInfo.MAX_PREVIEW_ENTRIES) {
+                    previewEntries.add(name);
+                }
                 if (!isDirectory(archive.input, index)) {
                     files++;
                     uncompressedBytes = addSize(
@@ -53,7 +59,8 @@ final class PpmdZipSupport {
                     entries,
                     files,
                     uncompressedBytes,
-                    encrypted
+                    encrypted,
+                    previewEntries
             );
         }
     }

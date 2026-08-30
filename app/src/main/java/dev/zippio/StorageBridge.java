@@ -14,8 +14,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.Locale;
 
 /** Bridges the Storage Access Framework and private temporary files. */
@@ -42,14 +44,44 @@ public final class StorageBridge {
         return work;
     }
 
+    /** Clears only the app-private work area left behind by a process that was killed. */
+    public static void clearStaleWork(Context context) {
+        deleteRecursively(new File(context.getCacheDir(), "zippio-work"));
+    }
+
     public static void copyTreeToDirectory(Context context, Uri treeUri, File targetDirectory)
             throws IOException {
+        copyTreeToDirectory(context, treeUri, targetDirectory, true);
+    }
+
+    public static void copyTreeToDirectory(
+            Context context,
+            Uri treeUri,
+            File targetDirectory,
+            boolean includeHiddenFiles
+    ) throws IOException {
         if (!targetDirectory.exists() && !targetDirectory.mkdirs()) {
             throw new IOException("一時フォルダを作成できません。");
         }
         String treeId = DocumentsContract.getTreeDocumentId(treeUri);
         Uri root = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId);
-        copyDocumentChildren(context, root, targetDirectory);
+        copyDocumentChildren(context, root, targetDirectory, includeHiddenFiles);
+    }
+
+    /** Copies files chosen with ACTION_OPEN_DOCUMENT into one private source directory. */
+    public static void copyUrisToDirectory(Context context, List<Uri> sourceUris, File targetDirectory)
+            throws IOException {
+        if (sourceUris == null || sourceUris.isEmpty()) {
+            throw new IOException("圧縮するファイルを選んでください。");
+        }
+        if (!targetDirectory.exists() && !targetDirectory.mkdirs()) {
+            throw new IOException("一時フォルダを作成できません。");
+        }
+        for (Uri uri : sourceUris) {
+            throwIfInterrupted();
+            String name = localName(displayName(context, uri, "ファイル"));
+            copyUriToFile(context, uri, uniqueLocalFile(targetDirectory, name));
+        }
     }
 
     public static void copyUriToFile(Context context, Uri source, File destination) throws IOException {
@@ -111,9 +143,9 @@ public final class StorageBridge {
         try {
             String treeId = DocumentsContract.getTreeDocumentId(treeUri);
             Uri root = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId);
-            return displayName(context, root, "files");
+            return displayName(context, root, "ファイル");
         } catch (Exception ignored) {
-            return "files";
+            return "ファイル";
         }
     }
 
@@ -131,9 +163,9 @@ public final class StorageBridge {
     }
 
     public static String safeFileStem(String name) {
-        String stem = name == null ? "archive" : name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+        String stem = name == null ? "アーカイブ" : name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
         if (stem.isEmpty()) {
-            return "archive";
+            return "アーカイブ";
         }
         return stem.length() > 80 ? stem.substring(0, 80) : stem;
     }
@@ -157,7 +189,12 @@ public final class StorageBridge {
         target.delete();
     }
 
-    private static void copyDocumentChildren(Context context, Uri parentUri, File targetDirectory)
+    private static void copyDocumentChildren(
+            Context context,
+            Uri parentUri,
+            File targetDirectory,
+            boolean includeHiddenFiles
+    )
             throws IOException {
         ContentResolver resolver = context.getContentResolver();
         String parentId = DocumentsContract.getDocumentId(parentUri);
@@ -167,9 +204,13 @@ public final class StorageBridge {
                 throw new IOException("フォルダの内容を読み取れません。");
             }
             while (cursor.moveToNext()) {
+                throwIfInterrupted();
                 String documentId = cursor.getString(0);
                 String displayName = cursor.getString(1);
                 String mimeType = cursor.getString(2);
+                if (!includeHiddenFiles && displayName != null && displayName.startsWith(".")) {
+                    continue;
+                }
                 String safeName = localName(displayName);
                 Uri childUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, documentId);
                 File childTarget = new File(targetDirectory, safeName);
@@ -177,12 +218,30 @@ public final class StorageBridge {
                     if (!childTarget.mkdirs() && !childTarget.isDirectory()) {
                         throw new IOException("一時フォルダを作成できません: " + safeName);
                     }
-                    copyDocumentChildren(context, childUri, childTarget);
+                    copyDocumentChildren(context, childUri, childTarget, includeHiddenFiles);
                 } else {
                     copyUriToFile(context, childUri, childTarget);
                 }
             }
         }
+    }
+
+    private static File uniqueLocalFile(File directory, String preferredName) {
+        String base = preferredName;
+        String extension = "";
+        int dot = preferredName.lastIndexOf('.');
+        if (dot > 0) {
+            base = preferredName.substring(0, dot);
+            extension = preferredName.substring(dot);
+        }
+        for (int index = 0; index < 10_000; index++) {
+            File candidate = new File(directory,
+                    index == 0 ? preferredName : base + " (" + index + ")" + extension);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return new File(directory, base + "-" + System.nanoTime() + extension);
     }
 
     private static void copyDirectoryChildren(Context context, File sourceDirectory, Uri parentUri)
@@ -192,6 +251,7 @@ public final class StorageBridge {
             throw new IOException("展開したファイルを読み取れません。");
         }
         for (File child : children) {
+            throwIfInterrupted();
             String name = localName(child.getName());
             if (child.isDirectory()) {
                 Uri childDirectory = createUniqueDocument(
@@ -283,7 +343,14 @@ public final class StorageBridge {
         byte[] buffer = new byte[BUFFER_SIZE];
         int count;
         while ((count = input.read(buffer)) != -1) {
+            throwIfInterrupted();
             output.write(buffer, 0, count);
+        }
+    }
+
+    private static void throwIfInterrupted() throws InterruptedIOException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedIOException("操作を中止しました。");
         }
     }
 }

@@ -19,8 +19,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /** Archive operations performed only on app-private temporary files. */
 public final class ArchiveEngine {
@@ -43,7 +46,24 @@ public final class ArchiveEngine {
         }
 
         public static ArchiveFormat fromLabel(String label) {
-            return "7z".equalsIgnoreCase(label) ? SEVEN_Z : ZIP;
+            return label != null && label.startsWith("7z") ? SEVEN_Z : ZIP;
+        }
+    }
+
+    /** ZIP compression trade-off exposed in the creation flow. */
+    public enum CompressionProfile {
+        FAST,
+        NORMAL,
+        SMALL;
+
+        public static CompressionProfile fromLabel(String label) {
+            if (label != null && label.startsWith("高速")) {
+                return FAST;
+            }
+            if (label != null && label.startsWith("高圧縮")) {
+                return SMALL;
+            }
+            return NORMAL;
         }
     }
 
@@ -56,7 +76,7 @@ public final class ArchiveEngine {
      * rejected before the user chooses a destination folder.
      */
     public static ArchiveInfo inspect(File archive, char[] password) throws Exception {
-        String lowerName = archive.getName().toLowerCase();
+        String lowerName = archive.getName().toLowerCase(Locale.ROOT);
         if (lowerName.endsWith(".zip")) {
             return inspectZip(archive, password);
         } else if (lowerName.endsWith(".7z")) {
@@ -73,13 +93,26 @@ public final class ArchiveEngine {
             ArchiveFormat format,
             char[] password
     ) throws Exception {
+        create(sourceDirectory, destinationArchive, format, password,
+                CompressionProfile.NORMAL, true);
+    }
+
+    public static void create(
+            File sourceDirectory,
+            File destinationArchive,
+            ArchiveFormat format,
+            char[] password,
+            CompressionProfile compressionProfile,
+            boolean includeRootFolder
+    ) throws Exception {
         if (!sourceDirectory.isDirectory()) {
             throw new IOException("圧縮元フォルダを読み取れません。");
         }
         if (format == ArchiveFormat.ZIP) {
-            createZip(sourceDirectory, destinationArchive, password);
+            createZip(sourceDirectory, destinationArchive, password, compressionProfile,
+                    includeRootFolder);
         } else {
-            create7z(sourceDirectory, destinationArchive, password);
+            create7z(sourceDirectory, destinationArchive, password, includeRootFolder);
         }
     }
 
@@ -88,7 +121,7 @@ public final class ArchiveEngine {
             throw new IOException("展開先フォルダを作成できません。");
         }
 
-        String lowerName = archive.getName().toLowerCase();
+        String lowerName = archive.getName().toLowerCase(Locale.ROOT);
         if (lowerName.endsWith(".zip")) {
             extractZip(archive, destinationDirectory, password);
         } else if (lowerName.endsWith(".7z")) {
@@ -100,12 +133,18 @@ public final class ArchiveEngine {
         }
     }
 
-    private static void createZip(File sourceDirectory, File destinationArchive, char[] password)
+    private static void createZip(
+            File sourceDirectory,
+            File destinationArchive,
+            char[] password,
+            CompressionProfile compressionProfile,
+            boolean includeRootFolder
+    )
             throws Exception {
         ZipParameters parameters = new ZipParameters();
-        parameters.setIncludeRootFolder(true);
+        parameters.setIncludeRootFolder(includeRootFolder);
         parameters.setCompressionMethod(CompressionMethod.DEFLATE);
-        parameters.setCompressionLevel(CompressionLevel.NORMAL);
+        parameters.setCompressionLevel(zipLevelFor(compressionProfile));
         if (hasPassword(password)) {
             parameters.setEncryptFiles(true);
             parameters.setEncryptionMethod(EncryptionMethod.AES);
@@ -126,15 +165,18 @@ public final class ArchiveEngine {
             int files = 0;
             long uncompressedBytes = 0;
             boolean encrypted = false;
+            List<String> previewEntries = new ArrayList<>();
             for (FileHeader header : headers) {
                 validateArchiveEntryName(header.getFileName());
+                addPreviewEntry(previewEntries, header.getFileName());
                 if (!header.isDirectory()) {
                     files++;
                     uncompressedBytes = addSize(uncompressedBytes, header.getUncompressedSize());
                 }
                 encrypted |= header.isEncrypted();
             }
-            return new ArchiveInfo("ZIP", headers.size(), files, uncompressedBytes, encrypted);
+            return new ArchiveInfo("ZIP", headers.size(), files, uncompressedBytes, encrypted,
+                    previewEntries);
         } catch (ZipException error) {
             if (error.getType() != ZipException.Type.UNKNOWN_COMPRESSION_METHOD) {
                 throw error;
@@ -147,6 +189,7 @@ public final class ArchiveEngine {
         int entries = 0;
         int files = 0;
         long uncompressedBytes = 0;
+        List<String> previewEntries = new ArrayList<>();
         try (SevenZFile input = hasPassword(password)
                 ? new SevenZFile(archive, password)
                 : new SevenZFile(archive)) {
@@ -154,6 +197,7 @@ public final class ArchiveEngine {
             while ((entry = input.getNextEntry()) != null) {
                 entries++;
                 validateArchiveEntryName(entry.getName());
+                addPreviewEntry(previewEntries, entry.getName());
                 if (!entry.isDirectory()) {
                     files++;
                     uncompressedBytes = addSize(uncompressedBytes, entry.getSize());
@@ -162,19 +206,21 @@ public final class ArchiveEngine {
         }
         // Commons Compress does not expose per-entry 7z encryption metadata. Avoid claiming
         // encryption merely because the user supplied a password.
-        return new ArchiveInfo("7z", entries, files, uncompressedBytes, false);
+        return new ArchiveInfo("7z", entries, files, uncompressedBytes, false, previewEntries);
     }
 
     private static ArchiveInfo inspectRar(File archive, char[] password) throws Exception {
         String passwordString = hasPassword(password) ? new String(password) : null;
         int files = 0;
         long uncompressedBytes = 0;
+        List<String> previewEntries = new ArrayList<>();
         try (Archive input = passwordString == null
                 ? new Archive(archive)
                 : new Archive(archive, passwordString)) {
             List<com.github.junrar.rarfile.FileHeader> headers = input.getFileHeaders();
             for (com.github.junrar.rarfile.FileHeader entry : headers) {
                 validateArchiveEntryName(entry.getFileName());
+                addPreviewEntry(previewEntries, entry.getFileName());
                 if (!entry.isDirectory()) {
                     files++;
                     uncompressedBytes = addSize(uncompressedBytes, entry.getFullUnpackSize());
@@ -185,17 +231,33 @@ public final class ArchiveEngine {
                     headers.size(),
                     files,
                     uncompressedBytes,
-                    input.isEncrypted()
+                    input.isEncrypted(),
+                    previewEntries
             );
         }
     }
 
-    private static void create7z(File sourceDirectory, File destinationArchive, char[] password)
+    private static void create7z(
+            File sourceDirectory,
+            File destinationArchive,
+            char[] password,
+            boolean includeRootFolder
+    )
             throws Exception {
         try (SevenZOutputFile output = hasPassword(password)
                 ? new SevenZOutputFile(destinationArchive, password)
                 : new SevenZOutputFile(destinationArchive)) {
-            addTo7z(output, sourceDirectory, sourceDirectory.getName());
+            if (includeRootFolder) {
+                addTo7z(output, sourceDirectory, sourceDirectory.getName());
+                return;
+            }
+            File[] children = sourceDirectory.listFiles();
+            if (children == null) {
+                throw new IOException("フォルダを読み取れません: " + sourceDirectory.getName());
+            }
+            for (File child : children) {
+                addTo7z(output, child, child.getName());
+            }
         }
     }
 
@@ -336,19 +398,22 @@ public final class ArchiveEngine {
 
     /** Immutable archive metadata used for the extraction confirmation screen. */
     public static final class ArchiveInfo {
+        public static final int MAX_PREVIEW_ENTRIES = 8;
         public final String format;
         public final int entryCount;
         public final int fileCount;
         public final long uncompressedBytes;
         public final boolean encrypted;
+        public final List<String> previewEntries;
 
         ArchiveInfo(String format, int entryCount, int fileCount, long uncompressedBytes,
-                    boolean encrypted) {
+                    boolean encrypted, List<String> previewEntries) {
             this.format = format;
             this.entryCount = entryCount;
             this.fileCount = fileCount;
             this.uncompressedBytes = uncompressedBytes;
             this.encrypted = encrypted;
+            this.previewEntries = previewEntries;
         }
 
         public boolean needsCapacityWarning(long compressedBytes) {
@@ -365,6 +430,7 @@ public final class ArchiveEngine {
         byte[] buffer = new byte[BUFFER_SIZE];
         int count;
         while ((count = input.read(buffer)) != -1) {
+            throwIfInterrupted();
             output.write(buffer, 0, count);
         }
     }
@@ -373,7 +439,30 @@ public final class ArchiveEngine {
         byte[] buffer = new byte[BUFFER_SIZE];
         int count;
         while ((count = input.read(buffer)) != -1) {
+            throwIfInterrupted();
             output.write(buffer, 0, count);
+        }
+    }
+
+    private static CompressionLevel zipLevelFor(CompressionProfile profile) {
+        if (profile == CompressionProfile.FAST) {
+            return CompressionLevel.FASTEST;
+        }
+        if (profile == CompressionProfile.SMALL) {
+            return CompressionLevel.ULTRA;
+        }
+        return CompressionLevel.NORMAL;
+    }
+
+    private static void addPreviewEntry(List<String> entries, String name) {
+        if (entries.size() < ArchiveInfo.MAX_PREVIEW_ENTRIES) {
+            entries.add(name);
+        }
+    }
+
+    private static void throwIfInterrupted() throws InterruptedIOException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedIOException("操作を中止しました。");
         }
     }
 
