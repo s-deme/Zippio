@@ -1,10 +1,16 @@
 package dev.zippio;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
@@ -25,6 +31,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -46,6 +53,11 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_DESTINATION_DIRECTORY = 104;
     private static final int REQUEST_SOURCE_FILES = 105;
     private static final int REQUEST_VERIFY_ARCHIVE = 106;
+    private static final int REQUEST_NOTIFICATION_PERMISSION = 107;
+
+    private static final String NOTIFICATION_CHANNEL_ID = "archive_progress";
+    private static final int ACTIVE_OPERATION_NOTIFICATION_ID = 2001;
+    private static final int OUTCOME_NOTIFICATION_ID = 2002;
 
     private static final String PREFS_NAME = "zippio_options";
     private static final String PREF_FORMAT = "format";
@@ -56,6 +68,9 @@ public final class MainActivity extends Activity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainThread = new Handler(Looper.getMainLooper());
 
+    private ScrollView rootScroll;
+    private Button extractModeButton;
+    private Button compressModeButton;
     private Spinner formatSpinner;
     private FrameLayout formatField;
     private Spinner compressionLevelSpinner;
@@ -73,6 +88,8 @@ public final class MainActivity extends Activity {
     private Button cancelButton;
     private Button resetButton;
     private LinearLayout progressPanel;
+    private LinearLayout extractContent;
+    private LinearLayout compressContent;
     private ProgressBar progress;
     private TextView progressDetail;
     private TextView statusText;
@@ -81,6 +98,7 @@ public final class MainActivity extends Activity {
     private Future<?> activeTask;
     private volatile boolean cancellationRequested;
     private boolean working;
+    private boolean notificationPermissionRequestInFlight;
 
     private ArchiveEngine.ArchiveFormat pendingFormat;
     private ArchiveEngine.CompressionProfile pendingCompressionProfile;
@@ -102,8 +120,12 @@ public final class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         StorageBridge.clearStaleWork(this);
         setContentView(R.layout.activity_main);
-        applySystemBarInsets(findViewById(R.id.root_scroll));
+        rootScroll = findViewById(R.id.root_scroll);
+        applySystemBarInsets(rootScroll);
+        createNotificationChannel();
 
+        extractModeButton = findViewById(R.id.extract_mode_button);
+        compressModeButton = findViewById(R.id.compress_mode_button);
         formatSpinner = findViewById(R.id.format_spinner);
         formatField = findViewById(R.id.format_field);
         compressionLevelSpinner = findViewById(R.id.compression_level_spinner);
@@ -121,6 +143,8 @@ public final class MainActivity extends Activity {
         cancelButton = findViewById(R.id.cancel_button);
         resetButton = findViewById(R.id.reset_button);
         progressPanel = findViewById(R.id.progress_panel);
+        extractContent = findViewById(R.id.extract_content);
+        compressContent = findViewById(R.id.compress_content);
         progress = findViewById(R.id.progress);
         progressDetail = findViewById(R.id.progress_detail);
         statusText = findViewById(R.id.status_text);
@@ -137,6 +161,7 @@ public final class MainActivity extends Activity {
 
         restoreOptions();
         bindUi();
+        selectMode(Mode.EXTRACT);
         updateFormatDependentUi();
         updatePasswordHelper();
         setUiState(false, true);
@@ -180,7 +205,95 @@ public final class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
+    private void createNotificationChannel() {
+        NotificationChannel channel = new NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                getString(R.string.notification_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT
+        );
+        channel.setDescription(getString(R.string.notification_channel_description));
+        getSystemService(NotificationManager.class).createNotificationChannel(channel);
+    }
+
+    private void postOperationNotification(String status, int progressAmount) {
+        if (!canPostNotifications()) {
+            requestNotificationPermissionIfNeeded();
+            return;
+        }
+        Notification notification = new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_zippio)
+                .setContentTitle(getString(R.string.notification_processing_title))
+                .setContentText(status)
+                .setStyle(new Notification.BigTextStyle().bigText(status))
+                .setContentIntent(notificationContentIntent())
+                .setCategory(Notification.CATEGORY_PROGRESS)
+                .setOnlyAlertOnce(true)
+                .setOngoing(true)
+                .setProgress(100, progressAmount, false)
+                .build();
+        getSystemService(NotificationManager.class).notify(
+                ACTIVE_OPERATION_NOTIFICATION_ID,
+                notification
+        );
+    }
+
+    private void postOutcomeNotification(int titleResource, String message) {
+        if (!canPostNotifications()) {
+            return;
+        }
+        Notification notification = new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_zippio)
+                .setContentTitle(getString(titleResource))
+                .setContentText(message)
+                .setStyle(new Notification.BigTextStyle().bigText(message))
+                .setContentIntent(notificationContentIntent())
+                .setCategory(Notification.CATEGORY_STATUS)
+                .setAutoCancel(true)
+                .build();
+        getSystemService(NotificationManager.class).notify(OUTCOME_NOTIFICATION_ID, notification);
+    }
+
+    private PendingIntent notificationContentIntent() {
+        Intent intent = new Intent(this, MainActivity.class)
+                .setAction(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LAUNCHER)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+    }
+
+    private void cancelOperationNotification() {
+        getSystemService(NotificationManager.class).cancel(ACTIVE_OPERATION_NOTIFICATION_ID);
+    }
+
+    private boolean canPostNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        return getSystemService(NotificationManager.class).areNotificationsEnabled();
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || notificationPermissionRequestInFlight
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        notificationPermissionRequestInFlight = true;
+        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                REQUEST_NOTIFICATION_PERMISSION);
+    }
+
     private void bindUi() {
+        extractModeButton.setOnClickListener(view -> selectMode(Mode.EXTRACT));
+        compressModeButton.setOnClickListener(view -> selectMode(Mode.COMPRESS));
         compressFolderButton.setOnClickListener(view -> beginFolderCompression());
         compressFilesButton.setOnClickListener(view -> beginFileCompression());
         extractButton.setOnClickListener(view -> beginExtraction());
@@ -226,6 +339,31 @@ public final class MainActivity extends Activity {
                 // No-op.
             }
         });
+    }
+
+    /** Keeps the primary extraction path separate from compression-only choices. */
+    private void selectMode(Mode mode) {
+        boolean extracting = mode == Mode.EXTRACT;
+        extractContent.setVisibility(extracting ? View.VISIBLE : View.GONE);
+        compressContent.setVisibility(extracting ? View.GONE : View.VISIBLE);
+        updateModeButton(extractModeButton, extracting,
+                R.string.mode_extract, R.string.mode_extract_selected);
+        updateModeButton(compressModeButton, !extracting,
+                R.string.mode_compress, R.string.mode_compress_selected);
+    }
+
+    private void updateModeButton(
+            Button button,
+            boolean selected,
+            int unselectedDescription,
+            int selectedDescription
+    ) {
+        button.setSelected(selected);
+        button.setBackgroundResource(selected
+                ? R.drawable.button_primary : R.drawable.button_secondary);
+        button.setTextColor(getColor(selected
+                ? R.color.button_primary_text : R.color.button_secondary_text));
+        button.setContentDescription(getString(selected ? selectedDescription : unselectedDescription));
     }
 
     private void restoreOptions() {
@@ -351,6 +489,22 @@ public final class MainActivity extends Activity {
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_NOTIFICATION_PERMISSION) {
+            return;
+        }
+        notificationPermissionRequestInFlight = false;
+        if (working && canPostNotifications()) {
+            postOperationNotification(progressDetail.getText().toString(), progress.getProgress());
+        }
+    }
+
     private List<Uri> selectedUris(Intent data) {
         List<Uri> result = new ArrayList<>();
         if (data.getData() != null) {
@@ -433,6 +587,7 @@ public final class MainActivity extends Activity {
             clearPassword();
             working = false;
             activeTask = null;
+            cancelOperationNotification();
             setUiState(false, false);
             setStatus("圧縮が完了しました。保存先とファイル名を選んでください。");
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
@@ -504,6 +659,7 @@ public final class MainActivity extends Activity {
                     pendingArchiveUri = archiveUri;
                     working = false;
                     activeTask = null;
+                    cancelOperationNotification();
                     setUiState(false, false);
                     setStatus("内容を確認しました。解凍先を選んでください。");
                     showArchivePreview(archiveUri, localArchive, info);
@@ -724,6 +880,7 @@ public final class MainActivity extends Activity {
         clearPassword();
         finishWork();
         setStatus(message);
+        postOutcomeNotification(R.string.notification_complete_title, message);
     }
 
     private void finishCancelled() {
@@ -739,8 +896,9 @@ public final class MainActivity extends Activity {
         pendingArchiveUri = null;
         clearPassword();
         finishWork();
-        setStatus(getString(R.string.processing_failed,
-                localizedErrorMessage(error)));
+        String message = getString(R.string.processing_failed, localizedErrorMessage(error));
+        setStatus(message);
+        postOutcomeNotification(R.string.notification_failed_title, message);
     }
 
     private void postFailure(Exception error) {
@@ -763,12 +921,17 @@ public final class MainActivity extends Activity {
         setStatus(status);
         progress.setProgress(initialProgress);
         progressDetail.setText(status);
+        postOperationNotification(status, initialProgress);
+        progressPanel.post(() -> rootScroll.smoothScrollTo(0,
+                Math.max(0, progressPanel.getTop()
+                        - getResources().getDimensionPixelSize(R.dimen.space_sm))));
     }
 
     private void finishWork() {
         cancellationRequested = false;
         working = false;
         activeTask = null;
+        cancelOperationNotification();
         setUiState(false, true);
     }
 
@@ -778,6 +941,7 @@ public final class MainActivity extends Activity {
                 setStatus(status);
                 progressDetail.setText(status);
                 progress.setProgress(amount);
+                postOperationNotification(status, amount);
             }
         });
     }
@@ -904,6 +1068,8 @@ public final class MainActivity extends Activity {
 
     private void setUiState(boolean showProgress, boolean allowActions) {
         progressPanel.setVisibility(showProgress ? View.VISIBLE : View.GONE);
+        extractModeButton.setEnabled(allowActions);
+        compressModeButton.setEnabled(allowActions);
         compressFolderButton.setEnabled(allowActions);
         compressFilesButton.setEnabled(allowActions);
         extractButton.setEnabled(allowActions);
@@ -982,6 +1148,7 @@ public final class MainActivity extends Activity {
         if (activeTask != null) {
             activeTask.cancel(true);
         }
+        cancelOperationNotification();
         executor.shutdownNow();
         if (isFinishing()) {
             clearGeneratedArchive();
@@ -1029,6 +1196,11 @@ public final class MainActivity extends Activity {
             return "—";
         }
         return String.format(Locale.getDefault(), "%.1f", (double) expanded / compressed);
+    }
+
+    private enum Mode {
+        EXTRACT,
+        COMPRESS
     }
 
     private abstract static class SimpleItemSelectedListener
