@@ -15,8 +15,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Reads ZIP entries whose compression method is not implemented by zip4j, notably PPMd.
@@ -34,34 +32,19 @@ final class PpmdZipSupport {
     static ArchiveEngine.ArchiveInfo inspect(File file, char[] password) throws Exception {
         try (ArchiveHandle archive = open(file, password)) {
             int entries = archive.input.getNumberOfItems();
-            int files = 0;
-            long uncompressedBytes = 0;
+            ArchiveEngine.ArchiveSummary summary = new ArchiveEngine.ArchiveSummary();
             boolean encrypted = false;
-            List<String> previewEntries = new ArrayList<>();
 
             for (int index = 0; index < entries; index++) {
                 String name = archive.input.getStringProperty(index, PropID.PATH);
-                ArchiveEngine.validateArchiveEntryName(name);
-                if (previewEntries.size() < ArchiveEngine.ArchiveInfo.MAX_PREVIEW_ENTRIES) {
-                    previewEntries.add(name);
-                }
-                if (!isDirectory(archive.input, index)) {
-                    files++;
-                    uncompressedBytes = addSize(
-                            uncompressedBytes,
-                            numberProperty(archive.input, index, PropID.SIZE)
-                    );
-                }
+                summary.addEntry(
+                        name,
+                        isDirectory(archive.input, index),
+                        numberProperty(archive.input, index, PropID.SIZE)
+                );
                 encrypted |= Boolean.TRUE.equals(archive.input.getProperty(index, PropID.ENCRYPTED));
             }
-            return new ArchiveEngine.ArchiveInfo(
-                    "ZIP (PPMd)",
-                    entries,
-                    files,
-                    uncompressedBytes,
-                    encrypted,
-                    previewEntries
-            );
+            return summary.toArchiveInfo("ZIP (PPMd)", encrypted);
         }
     }
 
@@ -83,17 +66,15 @@ final class PpmdZipSupport {
 
             String passwordString = passwordString(password);
             for (Entry entry : archiveEntries) {
+                ArchiveEngine.ensureExtractionDirectory(
+                        entry.destination,
+                        entry.name,
+                        entry.directory
+                );
                 if (entry.directory) {
-                    if (!entry.destination.exists() && !entry.destination.mkdirs()) {
-                        throw new IOException("フォルダを作成できません: " + entry.name);
-                    }
                     continue;
                 }
 
-                File parent = entry.destination.getParentFile();
-                if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                    throw new IOException("フォルダを作成できません: " + entry.name);
-                }
                 try (OutputStream output = new BufferedOutputStream(
                         new FileOutputStream(entry.destination))) {
                     ExtractOperationResult result = archive.input.extractSlow(
@@ -154,13 +135,6 @@ final class PpmdZipSupport {
 
     private static String passwordString(char[] password) {
         return password == null || password.length == 0 ? null : new String(password);
-    }
-
-    private static long addSize(long total, long size) {
-        if (size <= 0) {
-            return total;
-        }
-        return Long.MAX_VALUE - total < size ? Long.MAX_VALUE : total + size;
     }
 
     private static final class ArchiveHandle implements AutoCloseable {

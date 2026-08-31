@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -67,6 +68,27 @@ public final class ArchiveEngine {
         }
     }
 
+    /** Formats that can be inspected and extracted. RAR is intentionally read-only. */
+    private enum InputFormat {
+        ZIP,
+        SEVEN_Z,
+        RAR;
+
+        static InputFormat fromArchive(File archive) throws IOException {
+            String lowerName = archive.getName().toLowerCase(Locale.ROOT);
+            if (lowerName.endsWith(".zip")) {
+                return ZIP;
+            }
+            if (lowerName.endsWith(".7z")) {
+                return SEVEN_Z;
+            }
+            if (lowerName.endsWith(".rar")) {
+                return RAR;
+            }
+            throw new IOException("ZIP、7z、RAR のいずれかを選んでください。");
+        }
+    }
+
     private ArchiveEngine() {
     }
 
@@ -76,15 +98,15 @@ public final class ArchiveEngine {
      * rejected before the user chooses a destination folder.
      */
     public static ArchiveInfo inspect(File archive, char[] password) throws Exception {
-        String lowerName = archive.getName().toLowerCase(Locale.ROOT);
-        if (lowerName.endsWith(".zip")) {
-            return inspectZip(archive, password);
-        } else if (lowerName.endsWith(".7z")) {
-            return inspect7z(archive, password);
-        } else if (lowerName.endsWith(".rar")) {
-            return inspectRar(archive, password);
+        switch (InputFormat.fromArchive(archive)) {
+            case ZIP:
+                return inspectZip(archive, password);
+            case SEVEN_Z:
+                return inspect7z(archive, password);
+            case RAR:
+                return inspectRar(archive, password);
         }
-        throw new IOException("ZIP、7z、RAR のいずれかを選んでください。");
+        throw new AssertionError("Unsupported input archive format");
     }
 
     public static void create(
@@ -121,16 +143,18 @@ public final class ArchiveEngine {
             throw new IOException("展開先フォルダを作成できません。");
         }
 
-        String lowerName = archive.getName().toLowerCase(Locale.ROOT);
-        if (lowerName.endsWith(".zip")) {
-            extractZip(archive, destinationDirectory, password);
-        } else if (lowerName.endsWith(".7z")) {
-            extract7z(archive, destinationDirectory, password);
-        } else if (lowerName.endsWith(".rar")) {
-            extractRar(archive, destinationDirectory, password);
-        } else {
-            throw new IOException("ZIP、7z、RAR のいずれかを選んでください。");
+        switch (InputFormat.fromArchive(archive)) {
+            case ZIP:
+                extractZip(archive, destinationDirectory, password);
+                return;
+            case SEVEN_Z:
+                extract7z(archive, destinationDirectory, password);
+                return;
+            case RAR:
+                extractRar(archive, destinationDirectory, password);
+                return;
         }
+        throw new AssertionError("Unsupported input archive format");
     }
 
     private static void createZip(
@@ -162,21 +186,17 @@ public final class ArchiveEngine {
                     ? new ZipFile(archive, password)
                     : new ZipFile(archive);
             List<FileHeader> headers = zip.getFileHeaders();
-            int files = 0;
-            long uncompressedBytes = 0;
+            ArchiveSummary summary = new ArchiveSummary();
             boolean encrypted = false;
-            List<String> previewEntries = new ArrayList<>();
             for (FileHeader header : headers) {
-                validateArchiveEntryName(header.getFileName());
-                addPreviewEntry(previewEntries, header.getFileName());
-                if (!header.isDirectory()) {
-                    files++;
-                    uncompressedBytes = addSize(uncompressedBytes, header.getUncompressedSize());
-                }
+                summary.addEntry(
+                        header.getFileName(),
+                        header.isDirectory(),
+                        header.getUncompressedSize()
+                );
                 encrypted |= header.isEncrypted();
             }
-            return new ArchiveInfo("ZIP", headers.size(), files, uncompressedBytes, encrypted,
-                    previewEntries);
+            return summary.toArchiveInfo("ZIP", encrypted);
         } catch (ZipException error) {
             if (error.getType() != ZipException.Type.UNKNOWN_COMPRESSION_METHOD) {
                 throw error;
@@ -186,54 +206,31 @@ public final class ArchiveEngine {
     }
 
     private static ArchiveInfo inspect7z(File archive, char[] password) throws Exception {
-        int entries = 0;
-        int files = 0;
-        long uncompressedBytes = 0;
-        List<String> previewEntries = new ArrayList<>();
+        ArchiveSummary summary = new ArchiveSummary();
         try (SevenZFile input = hasPassword(password)
                 ? new SevenZFile(archive, password)
                 : new SevenZFile(archive)) {
             SevenZArchiveEntry entry;
             while ((entry = input.getNextEntry()) != null) {
-                entries++;
-                validateArchiveEntryName(entry.getName());
-                addPreviewEntry(previewEntries, entry.getName());
-                if (!entry.isDirectory()) {
-                    files++;
-                    uncompressedBytes = addSize(uncompressedBytes, entry.getSize());
-                }
+                summary.addEntry(entry.getName(), entry.isDirectory(), entry.getSize());
             }
         }
         // Commons Compress does not expose per-entry 7z encryption metadata. Avoid claiming
         // encryption merely because the user supplied a password.
-        return new ArchiveInfo("7z", entries, files, uncompressedBytes, false, previewEntries);
+        return summary.toArchiveInfo("7z", false);
     }
 
     private static ArchiveInfo inspectRar(File archive, char[] password) throws Exception {
         String passwordString = hasPassword(password) ? new String(password) : null;
-        int files = 0;
-        long uncompressedBytes = 0;
-        List<String> previewEntries = new ArrayList<>();
+        ArchiveSummary summary = new ArchiveSummary();
         try (Archive input = passwordString == null
                 ? new Archive(archive)
                 : new Archive(archive, passwordString)) {
             List<com.github.junrar.rarfile.FileHeader> headers = input.getFileHeaders();
             for (com.github.junrar.rarfile.FileHeader entry : headers) {
-                validateArchiveEntryName(entry.getFileName());
-                addPreviewEntry(previewEntries, entry.getFileName());
-                if (!entry.isDirectory()) {
-                    files++;
-                    uncompressedBytes = addSize(uncompressedBytes, entry.getFullUnpackSize());
-                }
+                summary.addEntry(entry.getFileName(), entry.isDirectory(), entry.getFullUnpackSize());
             }
-            return new ArchiveInfo(
-                    "RAR",
-                    headers.size(),
-                    files,
-                    uncompressedBytes,
-                    input.isEncrypted(),
-                    previewEntries
-            );
+            return summary.toArchiveInfo("RAR", input.isEncrypted());
         }
     }
 
@@ -310,15 +307,9 @@ public final class ArchiveEngine {
             SevenZArchiveEntry entry;
             while ((entry = input.getNextEntry()) != null) {
                 File output = safeDestination(destinationDirectory, entry.getName());
+                ensureExtractionDirectory(output, entry.getName(), entry.isDirectory());
                 if (entry.isDirectory()) {
-                    if (!output.exists() && !output.mkdirs()) {
-                        throw new IOException("フォルダを作成できません: " + entry.getName());
-                    }
                     continue;
-                }
-                File parent = output.getParentFile();
-                if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                    throw new IOException("フォルダを作成できません: " + entry.getName());
                 }
                 try (BufferedOutputStream stream = new BufferedOutputStream(new FileOutputStream(output))) {
                     copyFrom7z(input, stream);
@@ -335,15 +326,9 @@ public final class ArchiveEngine {
                 : new Archive(archive, passwordString)) {
             for (com.github.junrar.rarfile.FileHeader entry : input.getFileHeaders()) {
                 File output = safeDestination(destinationDirectory, entry.getFileName());
+                ensureExtractionDirectory(output, entry.getFileName(), entry.isDirectory());
                 if (entry.isDirectory()) {
-                    if (!output.exists() && !output.mkdirs()) {
-                        throw new IOException("フォルダを作成できません: " + entry.getFileName());
-                    }
                     continue;
-                }
-                File parent = output.getParentFile();
-                if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                    throw new IOException("フォルダを作成できません: " + entry.getFileName());
                 }
                 try (OutputStream stream = new BufferedOutputStream(new FileOutputStream(output))) {
                     input.extractFile(entry, stream);
@@ -363,6 +348,17 @@ public final class ArchiveEngine {
             throw new IOException("展開先の外へ書き込もうとする項目を拒否しました。");
         }
         return target;
+    }
+
+    /** Creates the directory needed for an archive entry after its destination was validated. */
+    static void ensureExtractionDirectory(File target, String archiveName, boolean directory)
+            throws IOException {
+        File requiredDirectory = directory ? target : target.getParentFile();
+        if (requiredDirectory != null
+                && !requiredDirectory.exists()
+                && !requiredDirectory.mkdirs()) {
+            throw new IOException("フォルダを作成できません: " + archiveName);
+        }
     }
 
     static String validateArchiveEntryName(String archiveName) throws IOException {
@@ -396,6 +392,37 @@ public final class ArchiveEngine {
         return Long.MAX_VALUE - total < size ? Long.MAX_VALUE : total + size;
     }
 
+    /** Shared accumulator for archive inspection implementations. */
+    static final class ArchiveSummary {
+        private int entries;
+        private int files;
+        private long uncompressedBytes;
+        private final List<String> previewEntries = new ArrayList<>();
+
+        void addEntry(String name, boolean directory, long size) throws IOException {
+            validateArchiveEntryName(name);
+            entries++;
+            if (previewEntries.size() < ArchiveInfo.MAX_PREVIEW_ENTRIES) {
+                previewEntries.add(name);
+            }
+            if (!directory) {
+                files++;
+                uncompressedBytes = addSize(uncompressedBytes, size);
+            }
+        }
+
+        ArchiveInfo toArchiveInfo(String format, boolean encrypted) {
+            return new ArchiveInfo(
+                    format,
+                    entries,
+                    files,
+                    uncompressedBytes,
+                    encrypted,
+                    previewEntries
+            );
+        }
+    }
+
     /** Immutable archive metadata used for the extraction confirmation screen. */
     public static final class ArchiveInfo {
         public static final int MAX_PREVIEW_ENTRIES = 8;
@@ -426,16 +453,7 @@ public final class ArchiveEngine {
         }
     }
 
-    private static void copy(java.io.InputStream input, java.io.OutputStream output) throws IOException {
-        byte[] buffer = new byte[BUFFER_SIZE];
-        int count;
-        while ((count = input.read(buffer)) != -1) {
-            throwIfInterrupted();
-            output.write(buffer, 0, count);
-        }
-    }
-
-    private static void copyTo7z(java.io.InputStream input, SevenZOutputFile output) throws IOException {
+    private static void copyTo7z(InputStream input, SevenZOutputFile output) throws IOException {
         byte[] buffer = new byte[BUFFER_SIZE];
         int count;
         while ((count = input.read(buffer)) != -1) {
@@ -454,12 +472,6 @@ public final class ArchiveEngine {
         return CompressionLevel.NORMAL;
     }
 
-    private static void addPreviewEntry(List<String> entries, String name) {
-        if (entries.size() < ArchiveInfo.MAX_PREVIEW_ENTRIES) {
-            entries.add(name);
-        }
-    }
-
     private static void throwIfInterrupted() throws InterruptedIOException {
         if (Thread.currentThread().isInterrupted()) {
             throw new InterruptedIOException("操作を中止しました。");
@@ -470,6 +482,7 @@ public final class ArchiveEngine {
         byte[] buffer = new byte[BUFFER_SIZE];
         int count;
         while ((count = input.read(buffer)) != -1) {
+            throwIfInterrupted();
             output.write(buffer, 0, count);
         }
     }

@@ -2,6 +2,14 @@
 
 広告・アカウント・通信を使わない、個人用 Android 圧縮・解凍アプリです。ファイルはすべて端末内の一時領域で処理され、完了・失敗・中止後に削除されます。
 
+## 利用環境と基本操作
+
+- Android 8.0（API 26）以降に対応します。
+- 圧縮する場合は、フォルダまたは複数ファイルを選び、形式・圧縮設定・保存先の順に指定します。
+- 解凍する場合は、ZIP / 7z / RAR を選び、内容と安全性の確認画面を見てから保存先フォルダを指定します。
+- 保存せずに書庫の健全性だけを調べる場合は「壊れていないか確認する」を使います。
+- ファイルの読み書きは Android 標準のファイル選択画面を通して行います。ストレージ全体へのアクセス権限は不要です。
+
 ## 実装済みの製品要件
 
 | 軸 | 実装 |
@@ -40,7 +48,7 @@ PPMd（ZIP 圧縮方式 98）を含む ZIP は、解凍時に 7-Zip エンジン
 
 1. JDK 17 以降が同梱された最新の Android Studio でこのフォルダを開きます。
 2. SDK Platform 35 と Android SDK Build-Tools 36.0.0 をインストールし、Gradle Sync を実行します。
-3. testDebugUnitTest と lintDebug を実行し、端末またはエミュレータで Run を実行します。
+3. `testDebugUnitTest` と `lintDebug` を実行し、端末またはエミュレータで Run を実行します。
 
 ## PowerShell でのローカルビルド
 
@@ -56,7 +64,25 @@ PPMd（ZIP 圧縮方式 98）を含む ZIP は、解凍時に 7-Zip エンジン
 ./build.ps1 -Mode Debug -OutputDirectory out/local
 ```
 
+APKを作らずテストとLintだけを個別に確認する場合は、Gradle Wrapperを使います。
+
+```powershell
+./gradlew.bat testDebugUnitTest lintDebug --no-daemon
+```
+
 Releaseモードは、リポジトリ外にある固定keystoreと4つの署名環境変数がすべて設定されている場合だけ動作します。不足時はデバッグ鍵を生成・流用せず、ビルド開始前に失敗します。パスワードはコマンド引数へ渡さず、安全なシークレット管理手段から環境変数へ設定してください。
+
+## プロジェクト構成
+
+| パス | 役割 |
+| --- | --- |
+| `app/src/main/` | Androidアプリ本体、画面リソース、Manifest |
+| `app/src/test/` | アーカイブ処理のJVMユニットテスト |
+| `build.ps1` | テスト・Lint・APK生成・チェックサム作成をまとめたローカルビルド入口 |
+| `scripts/` | APK検証とReleaseバージョン検証 |
+| `.github/workflows/` | デバッグAPKのCIと署名済み正式Release |
+
+実装上の対応SDK、バージョン、依存関係は `app/build.gradle`、CIで固定するツールバージョンは `.github/workflows/` を正本とします。
 
 ## GitHub Actions
 
