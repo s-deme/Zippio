@@ -53,6 +53,7 @@ jobs:
           ./scripts/Verify-Apk.ps1
           -ApkPath dist/ci/zippio-debug.apk
           -BuildToolsVersion 36.0.0
+          -AllowedPermissions android.permission.POST_NOTIFICATIONS
 
       - name: Upload verified APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
