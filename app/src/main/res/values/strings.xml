@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Zippio</string>
-    <string name="title">Zippio</string>
-    <string name="subtitle">選んで、すぐに解凍。</string>
     <string name="local_processing_badge">オフライン処理 · アカウント不要</string>
     <string name="supported_formats">ZIP / 7z / RAR に対応</string>
     <string name="status_label">状態</string>
@@ -33,11 +31,10 @@
     <string name="extract_section_description">アーカイブを選び、内容を確認してから保存先を選びます。</string>
     <string name="extract_safety_note">既存ファイルは上書きしません。</string>
     <string name="extract">アーカイブを選んで解凍</string>
-    <string name="verify_archive">壊れていないか確認する</string>
     <string name="cancel_operation">処理を中止</string>
     <string name="reset_settings">設定を初期値に戻す</string>
     <string name="idle">アーカイブを選んで解凍できます。</string>
-    <string name="archive_received">ファイルを受け取りました。パスワードが必要なら入力してから、「解凍する」または「壊れていないか確認する」を選んでください。</string>
+    <string name="archive_received">ファイルを受け取りました。パスワードが必要なら入力してから、「解凍する」を選んでください。</string>
     <string name="archive_preview_title">解凍前の確認</string>
     <string name="archive_preview_template">%1$s&#10;&#10;形式: %2$s&#10;項目: %3$d 件（ファイル %4$d 件）&#10;展開後の目安: %5$s&#10;アーカイブの容量: %6$s&#10;展開倍率: 約 %7$s 倍</string>
     <string name="archive_preview_entries_title">先頭の項目</string>
@@ -60,8 +57,6 @@
     <string name="error_access">ファイルまたは保存先にアクセスできません。</string>
     <string name="error_missing_file">ファイルが見つかりません。もう一度選び直してください。</string>
     <string name="error_generic">ファイルを処理できませんでした。ファイルと保存先を確認して、もう一度お試しください。</string>
-    <string name="verification_complete_title">検証が完了しました</string>
-    <string name="verification_complete_message">%1$s を問題なく読み込めました。&#10;&#10;確認した項目: %2$d 件（ファイル %3$d 件）&#10;一時的に展開したデータは削除しました。</string>
     <string name="archive_saved_title">アーカイブを保存しました</string>
     <string name="archive_saved_message">選んだ場所にアーカイブを保存しました。</string>
     <string name="share">共有する</string>

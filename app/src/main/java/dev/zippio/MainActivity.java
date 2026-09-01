@@ -52,7 +52,6 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_ARCHIVE = 103;
     private static final int REQUEST_DESTINATION_DIRECTORY = 104;
     private static final int REQUEST_SOURCE_FILES = 105;
-    private static final int REQUEST_VERIFY_ARCHIVE = 106;
     private static final int REQUEST_NOTIFICATION_PERMISSION = 107;
 
     private static final String NOTIFICATION_CHANNEL_ID = "archive_progress";
@@ -84,7 +83,6 @@ public final class MainActivity extends Activity {
     private Button compressFolderButton;
     private Button compressFilesButton;
     private Button extractButton;
-    private Button verifyButton;
     private Button cancelButton;
     private Button resetButton;
     private LinearLayout progressPanel;
@@ -139,7 +137,6 @@ public final class MainActivity extends Activity {
         compressFolderButton = findViewById(R.id.compress_folder_button);
         compressFilesButton = findViewById(R.id.compress_files_button);
         extractButton = findViewById(R.id.extract_button);
-        verifyButton = findViewById(R.id.verify_button);
         cancelButton = findViewById(R.id.cancel_button);
         resetButton = findViewById(R.id.reset_button);
         progressPanel = findViewById(R.id.progress_panel);
@@ -297,7 +294,6 @@ public final class MainActivity extends Activity {
         compressFolderButton.setOnClickListener(view -> beginFolderCompression());
         compressFilesButton.setOnClickListener(view -> beginFileCompression());
         extractButton.setOnClickListener(view -> beginExtraction());
-        verifyButton.setOnClickListener(view -> beginVerification());
         cancelButton.setOnClickListener(view -> confirmCancellation());
         resetButton.setOnClickListener(view -> resetOptions());
         showPassword.setOnCheckedChangeListener((button, checked) -> {
@@ -414,16 +410,6 @@ public final class MainActivity extends Activity {
         startActivityForResult(archivePickerIntent(), REQUEST_ARCHIVE);
     }
 
-    private void beginVerification() {
-        capturePassword();
-        if (incomingArchiveUri != null) {
-            verifyArchive(incomingArchiveUri);
-            return;
-        }
-        setUiState(false, false);
-        startActivityForResult(archivePickerIntent(), REQUEST_VERIFY_ARCHIVE);
-    }
-
     private Intent archivePickerIntent() {
         return new Intent(Intent.ACTION_OPEN_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE)
@@ -484,8 +470,6 @@ public final class MainActivity extends Activity {
             prepareArchivePreview(selectedUri);
         } else if (requestCode == REQUEST_DESTINATION_DIRECTORY) {
             extractArchiveToTree(selectedUri);
-        } else if (requestCode == REQUEST_VERIFY_ARCHIVE) {
-            verifyArchive(selectedUri);
         }
     }
 
@@ -769,52 +753,6 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private void verifyArchive(Uri archiveUri) {
-        final char[] password = passwordCopy();
-        startWork("アーカイブを検証しています…", 12);
-        activeTask = executor.submit(() -> {
-            File work = null;
-            try {
-                work = StorageBridge.newWorkDirectory(this, "verify");
-                String archiveName = StorageBridge.safeFileName(
-                        StorageBridge.displayName(this, archiveUri, "アーカイブ"), "アーカイブ");
-                File localArchive = new File(work, archiveName);
-                StorageBridge.copyUriToFile(this, archiveUri, localArchive);
-                checkCancelled();
-                postProgress("アーカイブ構造を確認しています…", 38);
-                ArchiveEngine.ArchiveInfo info = ArchiveEngine.inspect(localArchive, password);
-                checkCancelled();
-                postProgress("すべての項目を読み込んでいます…", 64);
-                ArchiveEngine.extract(localArchive, new File(work, "verification"), password);
-                checkCancelled();
-                StorageBridge.deleteRecursively(work);
-                mainThread.post(() -> {
-                    if (cancellationRequested) {
-                        finishCancelled();
-                        return;
-                    }
-                    finishSuccessfully("アーカイブを検証しました。");
-                    new AlertDialog.Builder(this)
-                            .setTitle(R.string.verification_complete_title)
-                            .setMessage(getString(
-                                    R.string.verification_complete_message,
-                                    StorageBridge.displayName(this, archiveUri, "アーカイブ"),
-                                    info.entryCount,
-                                    info.fileCount
-                            ))
-                            .setPositiveButton(R.string.close, null)
-                            .show();
-                });
-                work = null;
-            } catch (Exception error) {
-                StorageBridge.deleteRecursively(work);
-                postFailure(error);
-            } finally {
-                wipe(password);
-            }
-        });
-    }
-
     private void showArchiveSavedDialog() {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.archive_saved_title)
@@ -1073,7 +1011,6 @@ public final class MainActivity extends Activity {
         compressFolderButton.setEnabled(allowActions);
         compressFilesButton.setEnabled(allowActions);
         extractButton.setEnabled(allowActions);
-        verifyButton.setEnabled(allowActions);
         resetButton.setEnabled(allowActions);
         formatSpinner.setEnabled(allowActions);
         formatField.setEnabled(allowActions);
