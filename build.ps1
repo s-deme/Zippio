@@ -202,6 +202,9 @@ $verificationArguments = @{
     ApkPath = $outputApk
     AndroidSdkRoot = $resolvedSdkRoot
     BuildToolsVersion = $BuildToolsVersion
+    AllowedPermissions = @(
+        'android.permission.POST_NOTIFICATIONS'
+    )
 }
 if ($Mode -eq 'Release') {
     $verificationArguments['RejectDebugCertificate'] = $true
