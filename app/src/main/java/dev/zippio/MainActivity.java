@@ -21,6 +21,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.AdapterView;
@@ -29,6 +30,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -75,22 +77,51 @@ public final class MainActivity extends Activity {
     private Spinner compressionLevelSpinner;
     private FrameLayout compressionLevelField;
     private TextView compressionLevelLabel;
+    private TextView formatHelpText;
     private EditText passwordInput;
     private TextView passwordStrength;
-    private CheckBox showPassword;
+    private ImageButton showPasswordButton;
+    private EditText extractPasswordInput;
+    private ImageButton extractShowPasswordButton;
     private CheckBox includeRootFolder;
     private CheckBox includeHiddenFiles;
     private Button compressFolderButton;
     private Button compressFilesButton;
+    private Button compressExecuteButton;
+    private Button compressChangeButton;
+    private Button compressClearButton;
+    private Button zipFormatButton;
+    private Button sevenZFormatButton;
+    private Button advancedToggleButton;
+    private Button shareButton;
+    private Button compressAgainButton;
     private Button extractButton;
+    private Button extractPasswordToggle;
+    private Button extractAgainButton;
     private Button cancelButton;
     private Button resetButton;
+    private Button errorRecoveryButton;
+    private Button errorDismissButton;
+    private Button enableNotificationsButton;
     private LinearLayout progressPanel;
     private LinearLayout extractContent;
     private LinearLayout compressContent;
+    private LinearLayout extractWorkflowPanel;
+    private LinearLayout extractResultPanel;
+    private LinearLayout compressWorkflowPanel;
+    private LinearLayout compressResultPanel;
+    private LinearLayout compressSourceActions;
+    private LinearLayout compressSourcePanel;
+    private LinearLayout compressSettingsPanel;
+    private LinearLayout advancedSettingsPanel;
+    private LinearLayout extractPasswordPanel;
+    private LinearLayout errorPanel;
+    private LinearLayout notificationNotice;
     private ProgressBar progress;
     private TextView progressDetail;
     private TextView statusText;
+    private TextView errorText;
+    private TextView compressSourceSummary;
 
     private SharedPreferences preferences;
     private Future<?> activeTask;
@@ -112,6 +143,12 @@ public final class MainActivity extends Activity {
     private File preparedArchive;
     private Uri lastSavedArchiveUri;
     private String lastSavedArchiveMimeType;
+    private Uri selectedSourceTreeUri;
+    private final List<Uri> selectedSourceFileUris = new ArrayList<>();
+    private SourceKind selectedSourceKind = SourceKind.NONE;
+    private Uri pendingDestinationTreeUri;
+    private OperationContext operationContext = OperationContext.NONE;
+    private Runnable recoveryAction;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -129,22 +166,51 @@ public final class MainActivity extends Activity {
         compressionLevelSpinner = findViewById(R.id.compression_level_spinner);
         compressionLevelField = findViewById(R.id.compression_level_field);
         compressionLevelLabel = findViewById(R.id.compression_level_label);
+        formatHelpText = findViewById(R.id.format_help_text);
         passwordInput = findViewById(R.id.password_input);
         passwordStrength = findViewById(R.id.password_strength);
-        showPassword = findViewById(R.id.show_password);
+        showPasswordButton = findViewById(R.id.show_password_button);
+        extractPasswordInput = findViewById(R.id.extract_password_input);
+        extractShowPasswordButton = findViewById(R.id.extract_show_password_button);
         includeRootFolder = findViewById(R.id.include_root_folder);
         includeHiddenFiles = findViewById(R.id.include_hidden_files);
         compressFolderButton = findViewById(R.id.compress_folder_button);
         compressFilesButton = findViewById(R.id.compress_files_button);
+        compressExecuteButton = findViewById(R.id.compress_execute_button);
+        compressChangeButton = findViewById(R.id.compress_change_button);
+        compressClearButton = findViewById(R.id.compress_clear_button);
+        zipFormatButton = findViewById(R.id.zip_format_button);
+        sevenZFormatButton = findViewById(R.id.seven_z_format_button);
+        advancedToggleButton = findViewById(R.id.advanced_toggle_button);
+        shareButton = findViewById(R.id.share_button);
+        compressAgainButton = findViewById(R.id.compress_again_button);
         extractButton = findViewById(R.id.extract_button);
+        extractPasswordToggle = findViewById(R.id.extract_password_toggle);
+        extractAgainButton = findViewById(R.id.extract_again_button);
         cancelButton = findViewById(R.id.cancel_button);
         resetButton = findViewById(R.id.reset_button);
+        errorRecoveryButton = findViewById(R.id.error_recovery_button);
+        errorDismissButton = findViewById(R.id.error_dismiss_button);
+        enableNotificationsButton = findViewById(R.id.enable_notifications_button);
         progressPanel = findViewById(R.id.progress_panel);
         extractContent = findViewById(R.id.extract_content);
         compressContent = findViewById(R.id.compress_content);
+        extractWorkflowPanel = findViewById(R.id.extract_workflow_panel);
+        extractResultPanel = findViewById(R.id.extract_result_panel);
+        compressWorkflowPanel = findViewById(R.id.compress_workflow_panel);
+        compressResultPanel = findViewById(R.id.compress_result_panel);
+        compressSourceActions = findViewById(R.id.compress_source_actions);
+        compressSourcePanel = findViewById(R.id.compress_source_panel);
+        compressSettingsPanel = findViewById(R.id.compress_settings_panel);
+        advancedSettingsPanel = findViewById(R.id.advanced_settings_panel);
+        extractPasswordPanel = findViewById(R.id.extract_password_panel);
+        errorPanel = findViewById(R.id.error_panel);
+        notificationNotice = findViewById(R.id.notification_notice);
         progress = findViewById(R.id.progress);
         progressDetail = findViewById(R.id.progress_detail);
         statusText = findViewById(R.id.status_text);
+        errorText = findViewById(R.id.error_text);
+        compressSourceSummary = findViewById(R.id.compress_source_summary);
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         formatSpinner.setAdapter(ArrayAdapter.createFromResource(
@@ -162,6 +228,9 @@ public final class MainActivity extends Activity {
         updateFormatDependentUi();
         updatePasswordHelper();
         setUiState(false, true);
+        updateCompressionSelectionUi();
+        updateNotificationNotice();
+        clearStatus();
         handleIncomingArchive(getIntent());
     }
 
@@ -214,7 +283,6 @@ public final class MainActivity extends Activity {
 
     private void postOperationNotification(String status, int progressAmount) {
         if (!canPostNotifications()) {
-            requestNotificationPermissionIfNeeded();
             return;
         }
         Notification notification = new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
@@ -293,15 +361,40 @@ public final class MainActivity extends Activity {
         compressModeButton.setOnClickListener(view -> selectMode(Mode.COMPRESS));
         compressFolderButton.setOnClickListener(view -> beginFolderCompression());
         compressFilesButton.setOnClickListener(view -> beginFileCompression());
+        compressExecuteButton.setOnClickListener(view -> executeCompression());
+        compressChangeButton.setOnClickListener(view -> changeCompressionSelection());
+        compressClearButton.setOnClickListener(view -> clearCompressionSelection());
+        zipFormatButton.setOnClickListener(view -> {
+            formatSpinner.setSelection(0);
+            updateFormatDependentUi();
+        });
+        sevenZFormatButton.setOnClickListener(view -> {
+            formatSpinner.setSelection(1);
+            updateFormatDependentUi();
+        });
+        advancedToggleButton.setOnClickListener(view -> toggleAdvancedSettings());
+        showPasswordButton.setOnClickListener(
+                view -> togglePasswordVisibility(passwordInput, showPasswordButton));
+        extractShowPasswordButton.setOnClickListener(
+                view -> togglePasswordVisibility(extractPasswordInput, extractShowPasswordButton));
+        extractPasswordToggle.setOnClickListener(view ->
+                showExtractionPasswordPanel(extractPasswordPanel.getVisibility() != View.VISIBLE));
         extractButton.setOnClickListener(view -> beginExtraction());
+        extractAgainButton.setOnClickListener(view -> restartExtractionFlow());
+        shareButton.setOnClickListener(view -> shareLastArchive());
+        compressAgainButton.setOnClickListener(view -> restartCompressionFlow());
         cancelButton.setOnClickListener(view -> confirmCancellation());
         resetButton.setOnClickListener(view -> resetOptions());
-        showPassword.setOnCheckedChangeListener((button, checked) -> {
-            passwordInput.setTransformationMethod(checked
-                    ? HideReturnsTransformationMethod.getInstance()
-                    : PasswordTransformationMethod.getInstance());
-            passwordInput.setSelection(passwordInput.length());
+        errorRecoveryButton.setOnClickListener(view -> {
+            Runnable action = recoveryAction;
+            clearError();
+            if (action != null) {
+                action.run();
+            }
         });
+        errorDismissButton.setOnClickListener(view -> clearError());
+        enableNotificationsButton.setOnClickListener(view -> requestNotificationPermissionIfNeeded());
+
         formatSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -346,6 +439,10 @@ public final class MainActivity extends Activity {
                 R.string.mode_extract, R.string.mode_extract_selected);
         updateModeButton(compressModeButton, !extracting,
                 R.string.mode_compress, R.string.mode_compress_selected);
+        if (!working) {
+            clearStatus();
+            clearError();
+        }
     }
 
     private void updateModeButton(
@@ -380,8 +477,7 @@ public final class MainActivity extends Activity {
     private void beginCompressionSelection(int requestCode, boolean filesOnly) {
         incomingArchiveUri = null;
         clearPreparedArchive();
-        captureCreateOptions();
-        setUiState(false, false);
+        clearError();
         Intent intent;
         if (filesOnly) {
             intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -400,10 +496,74 @@ public final class MainActivity extends Activity {
         startActivityForResult(intent, requestCode);
     }
 
+    private void executeCompression() {
+        if (!hasCompressionSource()) {
+            showError(
+                    "圧縮するファイルまたはフォルダを選んでください。",
+                    R.string.retry_select_file,
+                    this::beginFileCompression);
+            return;
+        }
+        captureCreateOptions();
+        setUiState(false, false);
+        if (selectedSourceKind == SourceKind.FOLDER && selectedSourceTreeUri != null) {
+            createArchiveFromTree(selectedSourceTreeUri);
+        } else if (selectedSourceKind == SourceKind.FILES && !selectedSourceFileUris.isEmpty()) {
+            createArchiveFromUris(new ArrayList<>(selectedSourceFileUris));
+        }
+    }
+
+    private boolean hasCompressionSource() {
+        return (selectedSourceKind == SourceKind.FOLDER && selectedSourceTreeUri != null)
+                || (selectedSourceKind == SourceKind.FILES && !selectedSourceFileUris.isEmpty());
+    }
+
+    private void changeCompressionSelection() {
+        if (selectedSourceKind == SourceKind.FOLDER) {
+            beginFolderCompression();
+        } else {
+            beginFileCompression();
+        }
+    }
+
+    private void clearCompressionSelection() {
+        selectedSourceTreeUri = null;
+        selectedSourceFileUris.clear();
+        selectedSourceKind = SourceKind.NONE;
+        updateCompressionSelectionUi();
+        clearStatus();
+        clearError();
+    }
+
+    private void updateCompressionSelectionUi() {
+        boolean selected = hasCompressionSource();
+        compressSourceActions.setVisibility(selected ? View.GONE : View.VISIBLE);
+        compressSourcePanel.setVisibility(selected ? View.VISIBLE : View.GONE);
+        compressSettingsPanel.setVisibility(selected ? View.VISIBLE : View.GONE);
+        compressExecuteButton.setEnabled(selected && !working);
+
+        if (!selected) {
+            compressSourceSummary.setText("");
+            return;
+        }
+        if (selectedSourceKind == SourceKind.FOLDER) {
+            String name = StorageBridge.treeDisplayName(this, selectedSourceTreeUri);
+            compressSourceSummary.setText(getString(R.string.selected_folder, name));
+        } else if (selectedSourceFileUris.size() == 1) {
+            Uri uri = selectedSourceFileUris.get(0);
+            String name = StorageBridge.displayName(this, uri, "ファイル");
+            compressSourceSummary.setText(getString(R.string.selected_file_single, name));
+        } else {
+            compressSourceSummary.setText(
+                    getString(R.string.selected_files_count, selectedSourceFileUris.size()));
+        }
+    }
+
     private void beginExtraction() {
         capturePassword();
-        if (incomingArchiveUri != null) {
-            prepareArchivePreview(incomingArchiveUri);
+        Uri archiveUri = pendingArchiveUri != null ? pendingArchiveUri : incomingArchiveUri;
+        if (archiveUri != null) {
+            prepareArchivePreview(archiveUri);
             return;
         }
         setUiState(false, false);
@@ -450,7 +610,14 @@ public final class MainActivity extends Activity {
             for (Uri uri : selectedUris) {
                 StorageBridge.takePersistablePermission(this, uri, data.getFlags());
             }
-            createArchiveFromUris(selectedUris);
+            selectedSourceTreeUri = null;
+            selectedSourceFileUris.clear();
+            selectedSourceFileUris.addAll(selectedUris);
+            selectedSourceKind = SourceKind.FILES;
+            setUiState(false, true);
+            updateCompressionSelectionUi();
+            clearStatus();
+            clearError();
             return;
         }
 
@@ -462,13 +629,21 @@ public final class MainActivity extends Activity {
         StorageBridge.takePersistablePermission(this, selectedUri, data.getFlags());
 
         if (requestCode == REQUEST_SOURCE_DIRECTORY) {
-            createArchiveFromTree(selectedUri);
+            selectedSourceFileUris.clear();
+            selectedSourceTreeUri = selectedUri;
+            selectedSourceKind = SourceKind.FOLDER;
+            setUiState(false, true);
+            updateCompressionSelectionUi();
+            clearStatus();
+            clearError();
         } else if (requestCode == REQUEST_CREATE_ARCHIVE) {
             saveGeneratedArchive(selectedUri);
         } else if (requestCode == REQUEST_ARCHIVE) {
+            incomingArchiveUri = null;
             pendingArchiveUri = selectedUri;
             prepareArchivePreview(selectedUri);
         } else if (requestCode == REQUEST_DESTINATION_DIRECTORY) {
+            pendingDestinationTreeUri = selectedUri;
             extractArchiveToTree(selectedUri);
         }
     }
@@ -484,6 +659,7 @@ public final class MainActivity extends Activity {
             return;
         }
         notificationPermissionRequestInFlight = false;
+        updateNotificationNotice();
         if (working && canPostNotifications()) {
             postOperationNotification(progressDetail.getText().toString(), progress.getProgress());
         }
@@ -508,6 +684,7 @@ public final class MainActivity extends Activity {
 
     private void createArchiveFromTree(Uri sourceTreeUri) {
         final ArchiveOptions options = pendingCreateOptions();
+        operationContext = OperationContext.COMPRESSION;
         startWork("フォルダを読み込んでいます…", 8);
         activeTask = executor.submit(() -> {
             File work = null;
@@ -535,6 +712,7 @@ public final class MainActivity extends Activity {
 
     private void createArchiveFromUris(List<Uri> sourceUris) {
         final ArchiveOptions options = pendingCreateOptions();
+        operationContext = OperationContext.COMPRESSION;
         startWork("選択したファイルを読み込んでいます…", 8);
         activeTask = executor.submit(() -> {
             File work = null;
@@ -574,14 +752,23 @@ public final class MainActivity extends Activity {
             cancelOperationNotification();
             setUiState(false, false);
             setStatus("圧縮が完了しました。保存先とファイル名を選んでください。");
-            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .setType(format.mimeType)
-                    .putExtra(Intent.EXTRA_TITLE, archive.getName())
-                    .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                    .addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-            startActivityForResult(intent, REQUEST_CREATE_ARCHIVE);
+            launchArchiveSavePicker();
         });
+    }
+
+    private void launchArchiveSavePicker() {
+        if (generatedArchive == null) {
+            finishWithError(new IllegalStateException("保存するアーカイブが見つかりません。"));
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType(generatedArchiveMimeType == null
+                        ? "application/octet-stream" : generatedArchiveMimeType)
+                .putExtra(Intent.EXTRA_TITLE, generatedArchive.getName())
+                .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                .addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent, REQUEST_CREATE_ARCHIVE);
     }
 
     private void saveGeneratedArchive(Uri destinationUri) {
@@ -589,6 +776,7 @@ public final class MainActivity extends Activity {
             finishWithError(new IllegalStateException("保存するアーカイブが見つかりません。"));
             return;
         }
+        operationContext = OperationContext.SAVE_ARCHIVE;
         final File archive = generatedArchive;
         startWork("アーカイブを保存しています…", 85);
         activeTask = executor.submit(() -> {
@@ -608,16 +796,14 @@ public final class MainActivity extends Activity {
                     showArchiveSavedDialog();
                 });
             } catch (Exception error) {
-                mainThread.post(() -> {
-                    clearGeneratedArchive();
-                    postFailureOnMain(error);
-                });
+                mainThread.post(() -> postFailureOnMain(error));
             }
         });
     }
 
     private void prepareArchivePreview(Uri archiveUri) {
         clearPreparedArchive();
+        operationContext = OperationContext.PREVIEW_ARCHIVE;
         final char[] password = passwordCopy();
         startWork("アーカイブの内容と安全性を確認しています…", 18);
         activeTask = executor.submit(() -> {
@@ -660,38 +846,81 @@ public final class MainActivity extends Activity {
 
     private void showArchivePreview(Uri archiveUri, File archive, ArchiveEngine.ArchiveInfo info) {
         long compressedBytes = archive.length();
-        String message = getString(
-                R.string.archive_preview_template,
-                StorageBridge.displayName(this, archiveUri, archive.getName()),
+        View content = LayoutInflater.from(this).inflate(R.layout.dialog_archive_preview, null);
+        TextView fileName = content.findViewById(R.id.preview_file_name);
+        TextView summary = content.findViewById(R.id.preview_summary);
+        TextView encryption = content.findViewById(R.id.preview_encryption);
+        LinearLayout warningPanel = content.findViewById(R.id.preview_warning_panel);
+        TextView warning = content.findViewById(R.id.preview_warning);
+        TextView entries = content.findViewById(R.id.preview_entries);
+        Button detailsButton = content.findViewById(R.id.preview_details_button);
+        TextView details = content.findViewById(R.id.preview_details);
+
+        fileName.setText(StorageBridge.displayName(this, archiveUri, archive.getName()));
+        summary.setText(getString(
+                R.string.archive_preview_summary,
                 info.format,
-                info.entryCount,
                 info.fileCount,
-                formatBytes(info.uncompressedBytes),
-                formatBytes(compressedBytes),
-                formatRatio(info.uncompressedBytes, compressedBytes)
-        );
-        if (!info.previewEntries.isEmpty()) {
-            message += "\n\n" + getString(R.string.archive_preview_entries_title) + "\n"
-                    + joinPreviewEntries(info.previewEntries);
+                formatBytes(info.uncompressedBytes)));
+        encryption.setText(info.encrypted
+                ? R.string.archive_preview_encrypted
+                : R.string.archive_preview_not_encrypted);
+        encryption.setTextColor(getColor(info.encrypted
+                ? R.color.color_warning : R.color.color_on_surface_variant));
+
+        if (info.previewEntries.isEmpty()) {
+            entries.setText(R.string.archive_preview_no_entries);
+        } else {
+            String previewText = joinPreviewEntries(info.previewEntries);
             int remaining = info.entryCount - info.previewEntries.size();
             if (remaining > 0) {
-                message += "\n" + getString(R.string.archive_preview_more_entries, remaining);
+                previewText += "\n" + getString(R.string.archive_preview_more_entries, remaining);
             }
+            entries.setText(previewText);
         }
-        if (info.encrypted) {
-            message += "\n\n" + getString(R.string.archive_preview_encrypted);
-        }
+
         if (info.needsCapacityWarning(compressedBytes)) {
-            message += "\n\n" + getString(R.string.archive_preview_capacity_warning);
+            warningPanel.setVisibility(View.VISIBLE);
+            warning.setText(R.string.archive_preview_capacity_warning);
         }
-        new AlertDialog.Builder(this)
+
+        details.setText(getString(
+                R.string.archive_preview_technical,
+                info.entryCount,
+                info.fileCount,
+                formatBytes(compressedBytes),
+                formatBytes(info.uncompressedBytes),
+                formatRatio(info.uncompressedBytes, compressedBytes)));
+        detailsButton.setOnClickListener(view -> {
+            boolean opening = details.getVisibility() != View.VISIBLE;
+            details.setVisibility(opening ? View.VISIBLE : View.GONE);
+            detailsButton.setText(opening
+                    ? R.string.archive_preview_hide_details
+                    : R.string.archive_preview_details);
+        });
+
+        boolean passwordRequired = info.encrypted && extractPasswordInput.length() == 0;
+        if (info.encrypted) {
+            showExtractionPasswordPanel(true);
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
                 .setTitle(R.string.archive_preview_title)
-                .setMessage(message)
+                .setView(content)
                 .setNegativeButton(R.string.cancel, (dialog, which) -> cancelPreparedArchive())
-                .setPositiveButton(R.string.choose_destination,
-                        (dialog, which) -> chooseExtractionDestination())
-                .setOnCancelListener(dialog -> cancelPreparedArchive())
-                .show();
+                .setOnCancelListener(dialog -> cancelPreparedArchive());
+
+        if (passwordRequired) {
+            builder.setPositiveButton(R.string.enter_password_action, (dialog, which) -> {
+                showExtractionPasswordPanel(true);
+                setStatus(getString(R.string.extract_password_required));
+                extractPasswordInput.requestFocus();
+            });
+        } else {
+            builder.setPositiveButton(R.string.choose_destination,
+                    (dialog, which) -> chooseExtractionDestination());
+        }
+        builder.show();
     }
 
     private String joinPreviewEntries(List<String> entries) {
@@ -721,6 +950,8 @@ public final class MainActivity extends Activity {
             finishWithError(new IllegalStateException("解凍するアーカイブが見つかりません。"));
             return;
         }
+        pendingDestinationTreeUri = destinationTreeUri;
+        operationContext = OperationContext.EXTRACT_ARCHIVE;
         final char[] password = passwordCopy();
         final File work = preparedArchiveWorkDirectory;
         final File localArchive = preparedArchive;
@@ -728,6 +959,7 @@ public final class MainActivity extends Activity {
         activeTask = executor.submit(() -> {
             try {
                 File extraction = new File(work, "extracted");
+                StorageBridge.deleteRecursively(extraction);
                 ArchiveEngine.extract(localArchive, extraction, password);
                 checkCancelled();
                 postProgress("選んだフォルダへ保存しています…", 78);
@@ -741,12 +973,10 @@ public final class MainActivity extends Activity {
                     }
                     clearPreparedArchive();
                     finishSuccessfully("解凍が完了しました。");
+                    showExtractionResult();
                 });
             } catch (Exception error) {
-                mainThread.post(() -> {
-                    clearPreparedArchive();
-                    postFailureOnMain(error);
-                });
+                mainThread.post(() -> postFailureOnMain(error));
             } finally {
                 wipe(password);
             }
@@ -754,12 +984,40 @@ public final class MainActivity extends Activity {
     }
 
     private void showArchiveSavedDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.archive_saved_title)
-                .setMessage(R.string.archive_saved_message)
-                .setNegativeButton(R.string.close, null)
-                .setPositiveButton(R.string.share, (dialog, which) -> shareLastArchive())
-                .show();
+        compressWorkflowPanel.setVisibility(View.GONE);
+        compressResultPanel.setVisibility(View.VISIBLE);
+        clearStatus();
+        clearError();
+    }
+
+    private void showExtractionResult() {
+        extractWorkflowPanel.setVisibility(View.GONE);
+        extractResultPanel.setVisibility(View.VISIBLE);
+        clearStatus();
+        clearError();
+    }
+
+    private void restartCompressionFlow() {
+        lastSavedArchiveUri = null;
+        lastSavedArchiveMimeType = null;
+        compressResultPanel.setVisibility(View.GONE);
+        compressWorkflowPanel.setVisibility(View.VISIBLE);
+        passwordInput.setText("");
+        advancedSettingsPanel.setVisibility(View.GONE);
+        advancedToggleButton.setText(R.string.advanced_settings);
+        clearCompressionSelection();
+    }
+
+    private void restartExtractionFlow() {
+        extractResultPanel.setVisibility(View.GONE);
+        extractWorkflowPanel.setVisibility(View.VISIBLE);
+        pendingArchiveUri = null;
+        incomingArchiveUri = null;
+        pendingDestinationTreeUri = null;
+        extractPasswordInput.setText("");
+        showExtractionPasswordPanel(false);
+        clearStatus();
+        clearError();
     }
 
     private void shareLastArchive() {
@@ -777,14 +1035,30 @@ public final class MainActivity extends Activity {
     }
 
     private void onPickerCancelled(int requestCode) {
-        if (requestCode == REQUEST_CREATE_ARCHIVE) {
-            clearGeneratedArchive();
-        } else if (requestCode == REQUEST_DESTINATION_DIRECTORY) {
-            clearPreparedArchive();
-        }
-        clearPassword();
         setUiState(false, true);
-        setStatus("操作をキャンセルしました。");
+        if (requestCode == REQUEST_SOURCE_DIRECTORY || requestCode == REQUEST_SOURCE_FILES) {
+            clearStatus();
+            return;
+        }
+        if (requestCode == REQUEST_CREATE_ARCHIVE) {
+            showError(
+                    "保存先の選択をキャンセルしました。作成済みのアーカイブはまだ保存できます。",
+                    R.string.retry_destination,
+                    this::launchArchiveSavePicker);
+            return;
+        }
+        if (requestCode == REQUEST_DESTINATION_DIRECTORY) {
+            showError(
+                    "解凍先の選択をキャンセルしました。内容確認済みのアーカイブは保持しています。",
+                    R.string.retry_destination,
+                    this::chooseExtractionDestination);
+            return;
+        }
+        if (requestCode == REQUEST_ARCHIVE) {
+            pendingArchiveUri = null;
+            clearPassword();
+            clearStatus();
+        }
     }
 
     private void confirmCancellation() {
@@ -831,12 +1105,90 @@ public final class MainActivity extends Activity {
     }
 
     private void finishWithError(Exception error) {
-        pendingArchiveUri = null;
-        clearPassword();
+        OperationContext failedContext = operationContext;
+        String message = localizedErrorMessage(error);
+        boolean passwordRelated = isPasswordRelated(error);
         finishWork();
-        String message = getString(R.string.processing_failed, localizedErrorMessage(error));
-        setStatus(message);
+        clearStatus();
+
+        if (passwordRelated && (failedContext == OperationContext.PREVIEW_ARCHIVE
+                || failedContext == OperationContext.EXTRACT_ARCHIVE)) {
+            showExtractionPasswordPanel(true);
+        }
+
+        switch (failedContext) {
+            case PREVIEW_ARCHIVE:
+                showError(
+                        message,
+                        passwordRelated ? R.string.retry_password : R.string.retry_preview,
+                        () -> {
+                            capturePassword();
+                            if (pendingArchiveUri != null) {
+                                prepareArchivePreview(pendingArchiveUri);
+                            } else {
+                                beginExtraction();
+                            }
+                        });
+                break;
+            case COMPRESSION:
+                showError(message, R.string.retry, this::executeCompression);
+                break;
+            case SAVE_ARCHIVE:
+                showError(message, R.string.retry_destination, this::launchArchiveSavePicker);
+                break;
+            case EXTRACT_ARCHIVE:
+                showError(
+                        message,
+                        passwordRelated ? R.string.retry_password : R.string.retry_destination,
+                        () -> {
+                            capturePassword();
+                            if (passwordRelated && pendingDestinationTreeUri != null) {
+                                extractArchiveToTree(pendingDestinationTreeUri);
+                            } else {
+                                chooseExtractionDestination();
+                            }
+                        });
+                break;
+            default:
+                showError(message, 0, null);
+                break;
+        }
         postOutcomeNotification(R.string.notification_failed_title, message);
+    }
+
+    private boolean isPasswordRelated(Exception error) {
+        Throwable current = error;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase(Locale.ROOT);
+                if (lower.contains("password") || lower.contains("encrypted")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private void showError(String message, int actionResource, Runnable action) {
+        recoveryAction = action;
+        errorText.setText(message);
+        errorRecoveryButton.setVisibility(action == null ? View.GONE : View.VISIBLE);
+        if (action != null && actionResource != 0) {
+            errorRecoveryButton.setText(actionResource);
+        }
+        errorPanel.setVisibility(View.VISIBLE);
+        errorPanel.post(() -> rootScroll.smoothScrollTo(
+                0,
+                Math.max(0, errorPanel.getTop()
+                        - getResources().getDimensionPixelSize(R.dimen.space_sm))));
+    }
+
+    private void clearError() {
+        recoveryAction = null;
+        errorPanel.setVisibility(View.GONE);
+        errorText.setText("");
     }
 
     private void postFailure(Exception error) {
@@ -853,6 +1205,7 @@ public final class MainActivity extends Activity {
     }
 
     private void startWork(String status, int initialProgress) {
+        clearError();
         cancellationRequested = false;
         working = true;
         setUiState(true, false);
@@ -869,6 +1222,7 @@ public final class MainActivity extends Activity {
         cancellationRequested = false;
         working = false;
         activeTask = null;
+        operationContext = OperationContext.NONE;
         cancelOperationNotification();
         setUiState(false, true);
     }
@@ -906,6 +1260,7 @@ public final class MainActivity extends Activity {
     private void cancelPreparedArchive() {
         clearPreparedArchive();
         pendingArchiveUri = null;
+        incomingArchiveUri = null;
         clearPassword();
         setUiState(false, true);
         setStatus("解凍をキャンセルしました。");
@@ -935,7 +1290,7 @@ public final class MainActivity extends Activity {
 
     private void capturePassword() {
         wipePendingPassword();
-        pendingPassword = passwordInput.getText().toString().toCharArray();
+        pendingPassword = extractPasswordInput.getText().toString().toCharArray();
     }
 
     private char[] passwordCopy() {
@@ -951,6 +1306,12 @@ public final class MainActivity extends Activity {
         wipePendingPassword();
         if (passwordInput != null) {
             passwordInput.setText("");
+        }
+        if (extractPasswordInput != null) {
+            extractPasswordInput.setText("");
+        }
+        if (extractPasswordPanel != null && extractPasswordToggle != null) {
+            showExtractionPasswordPanel(false);
         }
     }
 
@@ -968,6 +1329,50 @@ public final class MainActivity extends Activity {
         compressionLevelField.setVisibility(zip ? View.VISIBLE : View.GONE);
         compressionLevelSpinner.setEnabled(zip && formatSpinner.isEnabled() && !working);
         compressionLevelField.setEnabled(compressionLevelSpinner.isEnabled());
+        formatHelpText.setText(zip ? R.string.format_zip_help : R.string.format_7z_help);
+        updateChoiceButton(zipFormatButton, zip);
+        updateChoiceButton(sevenZFormatButton, !zip);
+    }
+
+    private void updateChoiceButton(Button button, boolean selected) {
+        button.setSelected(selected);
+        button.setBackgroundResource(selected
+                ? R.drawable.button_primary : R.drawable.button_secondary);
+        button.setTextColor(getColor(selected
+                ? R.color.button_primary_text : R.color.button_secondary_text));
+    }
+
+    private void toggleAdvancedSettings() {
+        boolean opening = advancedSettingsPanel.getVisibility() != View.VISIBLE;
+        advancedSettingsPanel.setVisibility(opening ? View.VISIBLE : View.GONE);
+        advancedToggleButton.setText(opening
+                ? R.string.hide_advanced_settings : R.string.advanced_settings);
+        updateFormatDependentUi();
+    }
+
+    private void togglePasswordVisibility(EditText input, ImageButton button) {
+        boolean showing = input.getTransformationMethod()
+                instanceof HideReturnsTransformationMethod;
+        input.setTransformationMethod(showing
+                ? PasswordTransformationMethod.getInstance()
+                : HideReturnsTransformationMethod.getInstance());
+        button.setImageResource(showing
+                ? R.drawable.ic_visibility : R.drawable.ic_visibility_off);
+        button.setContentDescription(getString(showing
+                ? R.string.show_password : R.string.hide_password));
+        input.setSelection(input.length());
+    }
+
+    private void showExtractionPasswordPanel(boolean show) {
+        extractPasswordPanel.setVisibility(show ? View.VISIBLE : View.GONE);
+        extractPasswordToggle.setVisibility(show ? View.GONE : View.VISIBLE);
+    }
+
+    private void updateNotificationNotice() {
+        boolean shouldExplain = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED;
+        notificationNotice.setVisibility(shouldExplain ? View.VISIBLE : View.GONE);
     }
 
     private void updatePasswordHelper() {
@@ -998,10 +1403,11 @@ public final class MainActivity extends Activity {
         compressionLevelSpinner.setSelection(0);
         includeRootFolder.setChecked(true);
         includeHiddenFiles.setChecked(false);
-        showPassword.setChecked(false);
         passwordInput.setText("");
+        advancedSettingsPanel.setVisibility(View.GONE);
+        advancedToggleButton.setText(R.string.advanced_settings);
         updateFormatDependentUi();
-        setStatus("設定を初期値に戻しました。");
+        setStatus("詳細設定を初期値に戻しました。");
     }
 
     private void setUiState(boolean showProgress, boolean allowActions) {
@@ -1010,20 +1416,43 @@ public final class MainActivity extends Activity {
         compressModeButton.setEnabled(allowActions);
         compressFolderButton.setEnabled(allowActions);
         compressFilesButton.setEnabled(allowActions);
+        compressChangeButton.setEnabled(allowActions);
+        compressClearButton.setEnabled(allowActions);
+        compressExecuteButton.setEnabled(allowActions && hasCompressionSource());
+        zipFormatButton.setEnabled(allowActions);
+        sevenZFormatButton.setEnabled(allowActions);
+        advancedToggleButton.setEnabled(allowActions);
         extractButton.setEnabled(allowActions);
+        extractPasswordToggle.setEnabled(allowActions);
+        extractPasswordInput.setEnabled(allowActions);
+        extractShowPasswordButton.setEnabled(allowActions);
         resetButton.setEnabled(allowActions);
         formatSpinner.setEnabled(allowActions);
         formatField.setEnabled(allowActions);
         includeRootFolder.setEnabled(allowActions);
         includeHiddenFiles.setEnabled(allowActions);
         passwordInput.setEnabled(allowActions);
-        showPassword.setEnabled(allowActions);
+        showPasswordButton.setEnabled(allowActions);
+        shareButton.setEnabled(allowActions);
+        compressAgainButton.setEnabled(allowActions);
+        extractAgainButton.setEnabled(allowActions);
+        enableNotificationsButton.setEnabled(!showProgress);
         cancelButton.setEnabled(showProgress && !cancellationRequested);
         updateFormatDependentUi();
     }
 
     private void setStatus(String message) {
+        if (message == null || message.isEmpty()) {
+            clearStatus();
+            return;
+        }
         statusText.setText(message);
+        statusText.setVisibility(View.VISIBLE);
+    }
+
+    private void clearStatus() {
+        statusText.setText("");
+        statusText.setVisibility(View.GONE);
     }
 
     /** Avoids exposing English library errors as the primary message in a Japanese UI. */
@@ -1110,7 +1539,9 @@ public final class MainActivity extends Activity {
             return;
         }
         StorageBridge.takePersistablePermission(this, archiveUri, intent.getFlags());
+        selectMode(Mode.EXTRACT);
         incomingArchiveUri = archiveUri;
+        pendingArchiveUri = archiveUri;
         setStatus(getString(R.string.archive_received));
     }
 
@@ -1138,6 +1569,20 @@ public final class MainActivity extends Activity {
     private enum Mode {
         EXTRACT,
         COMPRESS
+    }
+
+    private enum SourceKind {
+        NONE,
+        FILES,
+        FOLDER
+    }
+
+    private enum OperationContext {
+        NONE,
+        COMPRESSION,
+        SAVE_ARCHIVE,
+        PREVIEW_ARCHIVE,
+        EXTRACT_ARCHIVE
     }
 
     private abstract static class SimpleItemSelectedListener
