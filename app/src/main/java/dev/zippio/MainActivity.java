@@ -912,6 +912,7 @@ public final class MainActivity extends Activity {
 
         if (passwordRequired) {
             builder.setPositiveButton(R.string.enter_password_action, (dialog, which) -> {
+                setUiState(false, true);
                 showExtractionPasswordPanel(true);
                 setStatus(getString(R.string.extract_password_required));
                 extractPasswordInput.requestFocus();
