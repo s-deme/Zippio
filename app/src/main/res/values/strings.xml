@@ -1,47 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Zippio</string>
+    <string name="app_tagline">圧縮と解凍を、必要な操作だけで。</string>
     <string name="local_processing_badge">オフライン処理 · アカウント不要</string>
     <string name="supported_formats">ZIP / 7z / RAR に対応</string>
-    <string name="status_label">状態</string>
+
     <string name="progress_label">処理中</string>
     <string name="mode_extract">解凍</string>
     <string name="mode_compress">圧縮</string>
     <string name="mode_extract_selected">解凍（選択中）</string>
     <string name="mode_compress_selected">圧縮（選択中）</string>
-    <string name="create_overline">CREATE</string>
-    <string name="open_overline">OPEN</string>
-    <string name="compress_section_title">アーカイブを作る</string>
-    <string name="compress_section_description">形式を選んで、フォルダまたはファイルをひとつにまとめます。</string>
-    <string name="archive_format">アーカイブ形式</string>
+
+    <string name="extract_section_title">アーカイブを解凍</string>
+    <string name="extract_section_description">ZIP・7z・RAR ファイルを選び、内容を確認してから解凍します。</string>
+    <string name="extract_safety_note">既存ファイルは上書きしません。</string>
+    <string name="extract_select_file">ファイルを選ぶ</string>
+    <string name="extract_password_toggle">パスワードを入力（必要な場合）</string>
+    <string name="extract_password_title">解凍用パスワード</string>
+    <string name="extract_password_description">暗号化されたアーカイブの場合だけ入力してください。</string>
+    <string name="extract_password_required">このアーカイブはパスワードで保護されています。パスワードを入力して、もう一度内容を確認してください。</string>
+    <string name="extract_result_title">解凍が完了しました</string>
+    <string name="extract_result_message">選んだフォルダへファイルを保存しました。</string>
+    <string name="extract_again">別のファイルを解凍</string>
+
+    <string name="compress_section_title">ファイルを圧縮</string>
+    <string name="compress_section_description">最初に圧縮するファイルまたはフォルダを選んでください。</string>
+    <string name="select_files">ファイルを選ぶ</string>
+    <string name="select_folder">フォルダを選ぶ</string>
+    <string name="selected_source_label">選択中</string>
+    <string name="selected_files_count">%1$d 個のファイル</string>
+    <string name="selected_file_single">1 個のファイル · %1$s</string>
+    <string name="selected_folder">フォルダ · %1$s</string>
+    <string name="change_selection">選び直す</string>
+    <string name="clear_selection">選択を解除</string>
+    <string name="archive_format">形式</string>
+    <string name="format_zip">ZIP</string>
+    <string name="format_7z">7z</string>
+    <string name="format_zip_help">互換性を優先。ほとんどの端末やPCで開けます。</string>
+    <string name="format_7z_help">圧縮率を優先。サイズを小さくしたい場合に向いています。</string>
     <string name="compression_level">ZIP の圧縮レベル</string>
     <string name="compression_level_7z">7z は圧縮設定を自動で選びます</string>
     <string name="include_root_folder">フォルダ名ごとまとめる</string>
     <string name="include_hidden_files">隠しファイルも含める（通常は不要）</string>
-    <string name="password_section_title">パスワード</string>
-    <string name="password_section_description">パスワード付きの書庫、または保護したい圧縮ファイルだけ入力してください。入力内容は保存されません。</string>
-    <string name="password_label">パスワード（必要な場合）</string>
-    <string name="show_password">パスワードを表示</string>
-    <string name="password_note">空欄ならパスワードは使いません。入力内容は保存されません。</string>
+    <string name="password_section_title">パスワード保護</string>
+    <string name="password_section_description">必要な場合だけ設定してください。入力内容は保存されません。</string>
+    <string name="password_label">パスワード（任意）</string>
+    <string name="password_note">空欄ならパスワードは使いません。</string>
     <string name="password_strength_short">短いパスワードです。12 文字以上の長いフレーズをおすすめします。</string>
     <string name="password_strength_good">十分な長さです。パスワードはこの操作後に消去されます。</string>
-    <string name="compress_folder">フォルダを圧縮する</string>
-    <string name="compress_files">ファイルを選んで圧縮する</string>
-    <string name="extract_section_title">解凍する</string>
-    <string name="extract_section_description">アーカイブを選び、内容を確認してから保存先を選びます。</string>
-    <string name="extract_safety_note">既存ファイルは上書きしません。</string>
-    <string name="extract">アーカイブを選んで解凍</string>
+    <string name="show_password">パスワードを表示</string>
+    <string name="hide_password">パスワードを隠す</string>
+    <string name="advanced_settings">詳細設定</string>
+    <string name="hide_advanced_settings">詳細設定を閉じる</string>
+    <string name="compress_execute">圧縮して保存</string>
+    <string name="reset_settings">詳細設定を初期値に戻す</string>
+    <string name="compress_result_title">圧縮ファイルを保存しました</string>
+    <string name="compress_result_message">選んだ場所にアーカイブを保存しました。</string>
+    <string name="compress_again">別のものを圧縮</string>
+    <string name="share">共有する</string>
+
     <string name="cancel_operation">処理を中止</string>
-    <string name="reset_settings">設定を初期値に戻す</string>
-    <string name="idle">アーカイブを選んで解凍できます。</string>
-    <string name="archive_received">ファイルを受け取りました。パスワードが必要なら入力してから、「解凍する」を選んでください。</string>
-    <string name="archive_preview_title">解凍前の確認</string>
-    <string name="archive_preview_template">%1$s&#10;&#10;形式: %2$s&#10;項目: %3$d 件（ファイル %4$d 件）&#10;展開後の目安: %5$s&#10;アーカイブの容量: %6$s&#10;展開倍率: 約 %7$s 倍</string>
-    <string name="archive_preview_entries_title">先頭の項目</string>
-    <string name="archive_preview_more_entries">ほか %d 件</string>
-    <string name="archive_preview_encrypted">暗号化アーカイブです。パスワードが正しいことを確認してから進めてください。</string>
-    <string name="archive_preview_capacity_warning">注意: ファイル数または展開後の容量が大きくなる可能性があります。空き容量を確認してから続けてください。</string>
-    <string name="choose_destination">解凍先を選ぶ</string>
     <string name="cancel">キャンセル</string>
     <string name="continue_action">続ける</string>
     <string name="cancel_confirm_title">処理を中止しますか？</string>
@@ -49,7 +67,30 @@
     <string name="stop">中止する</string>
     <string name="operation_cancel_requested">中止を要求しました。安全に停止しています…</string>
     <string name="operation_cancelled">処理を中止しました。</string>
-    <string name="processing_failed">処理できませんでした: %1$s</string>
+
+    <string name="archive_received">アーカイブを受け取りました。内容を確認してから解凍できます。</string>
+    <string name="archive_preview_title">解凍前の確認</string>
+    <string name="archive_preview_summary">%1$s · ファイル %2$d 件 · 展開後 %3$s</string>
+    <string name="archive_preview_encrypted">パスワード保護あり</string>
+    <string name="archive_preview_not_encrypted">パスワード保護なし</string>
+    <string name="archive_preview_entries_title">内容の一部</string>
+    <string name="archive_preview_more_entries">ほか %d 件</string>
+    <string name="archive_preview_details">詳細を見る</string>
+    <string name="archive_preview_hide_details">詳細を閉じる</string>
+    <string name="archive_preview_technical">項目: %1$d 件（ファイル %2$d 件）&#10;アーカイブ容量: %3$s&#10;展開後の目安: %4$s&#10;展開倍率: 約 %5$s 倍</string>
+    <string name="archive_preview_capacity_warning">ファイル数または展開後の容量が大きくなる可能性があります。空き容量を確認してください。</string>
+    <string name="archive_preview_no_entries">表示できる項目情報はありません。</string>
+    <string name="choose_destination">解凍先を選ぶ</string>
+    <string name="enter_password_action">パスワードを入力</string>
+
+    <string name="error_title">処理を続けられませんでした</string>
+    <string name="processing_failed">%1$s</string>
+    <string name="retry">もう一度試す</string>
+    <string name="retry_select_file">もう一度ファイルを選ぶ</string>
+    <string name="retry_preview">もう一度内容を確認</string>
+    <string name="retry_password">パスワードを入力して再確認</string>
+    <string name="retry_destination">保存先を選び直す</string>
+    <string name="dismiss">閉じる</string>
     <string name="error_password">パスワードが違うか、この暗号化方式には対応していません。</string>
     <string name="error_damaged_archive">アーカイブが壊れているか、最後まで読み込めません。</string>
     <string name="error_unsupported_archive">この形式または圧縮方式には対応していません。</string>
@@ -57,14 +98,15 @@
     <string name="error_access">ファイルまたは保存先にアクセスできません。</string>
     <string name="error_missing_file">ファイルが見つかりません。もう一度選び直してください。</string>
     <string name="error_generic">ファイルを処理できませんでした。ファイルと保存先を確認して、もう一度お試しください。</string>
-    <string name="archive_saved_title">アーカイブを保存しました</string>
-    <string name="archive_saved_message">選んだ場所にアーカイブを保存しました。</string>
-    <string name="share">共有する</string>
-    <string name="close">閉じる</string>
-    <string name="privacy_note">ファイルは端末内だけで処理され、外部へ送信されません。</string>
+
+    <string name="notification_prompt_title">処理状況を通知できます</string>
+    <string name="notification_prompt_message">長い圧縮・解凍の進捗や完了を、アプリを見ていない間も通知で確認できます。</string>
+    <string name="enable_notifications">通知を有効にする</string>
     <string name="notification_channel_name">処理状況</string>
     <string name="notification_channel_description">圧縮・解凍の開始、進行状況、完了をお知らせします。</string>
     <string name="notification_processing_title">Zippioで処理中</string>
     <string name="notification_complete_title">処理が完了しました</string>
     <string name="notification_failed_title">処理できませんでした</string>
+
+    <string name="privacy_note">ファイルは端末内だけで処理され、外部へ送信されません。</string>
 </resources>
