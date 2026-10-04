@@ -118,6 +118,31 @@ public final class ExtractionBudgetTest {
         assertEquals(9, new File(root, "日本語/page.txt").length());
     }
 
+    @Test public void forgedZipSizeCannotBypassActualOutputLimit() throws Exception {
+        File archive = temporary.newFile("forged.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive.toPath()))) {
+            zip.putNextEntry(new ZipEntry("page.txt"));
+            zip.write(new byte[9]); zip.closeEntry();
+        }
+        byte[] data = Files.readAllBytes(archive.toPath());
+        java.nio.ByteBuffer fields = java.nio.ByteBuffer.wrap(data).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        int changed = 0;
+        for (int i = 0; i < data.length - 46; i++) {
+            if (fields.getInt(i) == 0x02014b50) {
+                fields.putInt(i + 24, 4); changed++;
+            }
+        }
+        assertEquals(1, changed);
+        Files.write(archive.toPath(), data);
+        try (net.lingala.zip4j.ZipFile zip = new net.lingala.zip4j.ZipFile(archive)) {
+            assertEquals(4, zip.getFileHeader("page.txt").getUncompressedSize());
+        }
+        File root = temporary.newFolder();
+        assertThrows(Exception.class, () -> ArchiveEngine.extract(archive, root, null,
+                new ExtractionBudget(root, 8, 16, 10, 0)));
+        assertEquals(0, root.list().length);
+    }
+
     @Test public void sevenZipStreamingRejectsExcessAndCleansCancellation() throws Exception {
         File archive = temporary.newFile("input.7z");
         try(org.apache.commons.compress.archivers.sevenz.SevenZOutputFile out = new org.apache.commons.compress.archivers.sevenz.SevenZOutputFile(archive)) {
