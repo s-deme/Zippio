@@ -1,0 +1,12 @@
+Official 7-Zip 26.03
+https://github.com/ip7z/7zip
+Commit: 0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17
+JNI source: https://github.com/omicronapps/7-Zip-JBinding-4Android
+Commit: 875f38aac441f41e6eb693177e020e97971dca97
+Engine files under src/main/cpp/7zip are unmodified upstream source.
+JNI source is adapted locally. Licenses in licenses/. Includes the unRAR restriction.
+NDK r28c; ELF max/common page size 16384; static libc++.
+Android API 30 emulator: x86_64, x86, arm64-v8a, armeabi-v7a regression passed.
+Each ABI: encrypted/wrong-password 7z, split 7z/RAR, RAR4/RAR5, Japanese 7z names.
+ELF PT_LOAD alignment verified as 0x4000 on all four ABIs.
+ARM tests use emulator native translation. PPMd ZIP regression is recorded separately.

@@ -139,22 +139,28 @@ public final class ArchiveEngine {
     }
 
     public static void extract(File archive, File destinationDirectory, char[] password) throws Exception {
-        if (!destinationDirectory.exists() && !destinationDirectory.mkdirs()) {
-            throw new IOException("展開先フォルダを作成できません。");
-        }
+        extract(archive, destinationDirectory, password, new ExtractionBudget(destinationDirectory));
+    }
 
-        switch (InputFormat.fromArchive(archive)) {
-            case ZIP:
-                extractZip(archive, destinationDirectory, password);
-                return;
-            case SEVEN_Z:
-                extract7z(archive, destinationDirectory, password);
-                return;
-            case RAR:
-                extractRar(archive, destinationDirectory, password);
-                return;
+    static void extract(File archive, File destinationDirectory, char[] password,
+                        ExtractionBudget budget) throws Exception {
+        try (ExtractionBudget ownedBudget = budget) {
+            budget.directory(destinationDirectory);
+            switch (InputFormat.fromArchive(archive)) {
+                case ZIP:
+                    extractZip(archive, destinationDirectory, password, budget);
+                    break;
+                case SEVEN_Z:
+                    extract7z(archive, destinationDirectory, password, budget);
+                    break;
+                case RAR:
+                    extractRar(archive, destinationDirectory, password, budget);
+                    break;
+                default:
+                    throw new AssertionError("Unsupported input archive format");
+            }
+            budget.commit();
         }
-        throw new AssertionError("Unsupported input archive format");
     }
 
     private static void createZip(
@@ -207,11 +213,12 @@ public final class ArchiveEngine {
 
     private static ArchiveInfo inspect7z(File archive, char[] password) throws Exception {
         ArchiveSummary summary = new ArchiveSummary();
-        try (SevenZFile input = hasPassword(password)
-                ? new SevenZFile(archive, password)
-                : new SevenZFile(archive)) {
+        try (SevenZFile input = SevenZFile.builder().setFile(archive)
+                .setPassword(password)
+                .setMaxMemoryLimitKiB(ExtractionBudget.MEMORY_LIMIT_KIB).get()) {
             SevenZArchiveEntry entry;
             while ((entry = input.getNextEntry()) != null) {
+                checkDictionary(entry);
                 summary.addEntry(entry.getName(), entry.isDirectory(), entry.getSize());
             }
         }
@@ -280,7 +287,8 @@ public final class ArchiveEngine {
         }
     }
 
-    private static void extractZip(File archive, File destinationDirectory, char[] password)
+    private static void extractZip(File archive, File destinationDirectory, char[] password,
+                                   ExtractionBudget budget)
             throws Exception {
         try {
             ZipFile zip = hasPassword(password)
@@ -290,47 +298,80 @@ public final class ArchiveEngine {
             for (FileHeader header : headers) {
                 safeDestination(destinationDirectory, header.getFileName());
             }
-            zip.extractAll(destinationDirectory.getAbsolutePath());
+            for (FileHeader header : headers) {
+                budget.entry();
+                File output = safeDestination(destinationDirectory, header.getFileName());
+                if (header.isDirectory()) {
+                    budget.directory(output);
+                    continue;
+                }
+                try (InputStream input = zip.getInputStream(header);
+                     OutputStream stream = budget.output(output)) {
+                    byte[] buffer = new byte[BUFFER_SIZE];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        stream.write(buffer, 0, count);
+                    }
+                }
+            }
         } catch (ZipException error) {
             if (error.getType() != ZipException.Type.UNKNOWN_COMPRESSION_METHOD) {
                 throw error;
             }
-            PpmdZipSupport.extract(archive, destinationDirectory, password);
+            PpmdZipSupport.extract(archive, destinationDirectory, password, budget);
         }
     }
 
-    private static void extract7z(File archive, File destinationDirectory, char[] password)
+    private static void extract7z(File archive, File destinationDirectory, char[] password,
+                                  ExtractionBudget budget)
             throws Exception {
-        try (SevenZFile input = hasPassword(password)
-                ? new SevenZFile(archive, password)
-                : new SevenZFile(archive)) {
+        try (SevenZFile input = SevenZFile.builder().setFile(archive)
+                .setPassword(password)
+                .setMaxMemoryLimitKiB(ExtractionBudget.MEMORY_LIMIT_KIB).get()) {
             SevenZArchiveEntry entry;
             while ((entry = input.getNextEntry()) != null) {
+                checkDictionary(entry);
+                budget.entry();
                 File output = safeDestination(destinationDirectory, entry.getName());
-                ensureExtractionDirectory(output, entry.getName(), entry.isDirectory());
                 if (entry.isDirectory()) {
+                    budget.directory(output);
                     continue;
                 }
-                try (BufferedOutputStream stream = new BufferedOutputStream(new FileOutputStream(output))) {
+                try (OutputStream stream = budget.output(output)) {
                     copyFrom7z(input, stream);
                 }
             }
         }
     }
 
-    private static void extractRar(File archive, File destinationDirectory, char[] password)
+    private static void checkDictionary(SevenZArchiveEntry entry) throws IOException {
+        if (entry.getContentMethods() == null) return;
+        for (org.apache.commons.compress.archivers.sevenz.SevenZMethodConfiguration method : entry.getContentMethods()) {
+            if (method.getMethod() == org.apache.commons.compress.archivers.sevenz.SevenZMethod.LZMA
+                    || method.getMethod() == org.apache.commons.compress.archivers.sevenz.SevenZMethod.LZMA2) {
+                Object options = method.getOptions();
+                long dictionary = options instanceof Number ? ((Number) options).longValue() : 0;
+                if (dictionary < 0 || dictionary > ExtractionBudget.DICTIONARY_LIMIT)
+                    throw new IOException("7z辞書が64 MiBの上限を超えました。");
+            }
+        }
+    }
+
+    private static void extractRar(File archive, File destinationDirectory, char[] password,
+                                   ExtractionBudget budget)
             throws Exception {
         String passwordString = hasPassword(password) ? new String(password) : null;
         try (Archive input = passwordString == null
                 ? new Archive(archive)
                 : new Archive(archive, passwordString)) {
             for (com.github.junrar.rarfile.FileHeader entry : input.getFileHeaders()) {
+                budget.entry();
                 File output = safeDestination(destinationDirectory, entry.getFileName());
-                ensureExtractionDirectory(output, entry.getFileName(), entry.isDirectory());
                 if (entry.isDirectory()) {
+                    budget.directory(output);
                     continue;
                 }
-                try (OutputStream stream = new BufferedOutputStream(new FileOutputStream(output))) {
+                try (OutputStream stream = budget.output(output)) {
                     input.extractFile(entry, stream);
                 }
             }
@@ -401,12 +442,17 @@ public final class ArchiveEngine {
 
         void addEntry(String name, boolean directory, long size) throws IOException {
             validateArchiveEntryName(name);
+            if (entries >= ExtractionBudget.ENTRY_LIMIT)
+                throw new IOException("展開項目数の上限を超えました。");
             entries++;
             if (previewEntries.size() < ArchiveInfo.MAX_PREVIEW_ENTRIES) {
                 previewEntries.add(name);
             }
             if (!directory) {
                 files++;
+                if (size > ExtractionBudget.FILE_LIMIT
+                        || size > ExtractionBudget.TOTAL_LIMIT - uncompressedBytes)
+                    throw new IOException("展開サイズの上限を超えました。");
                 uncompressedBytes = addSize(uncompressedBytes, size);
             }
         }

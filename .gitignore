@@ -17,3 +17,5 @@ local.properties
 *.pem
 .release-signing/
 release-signing/
+
+.cxx/

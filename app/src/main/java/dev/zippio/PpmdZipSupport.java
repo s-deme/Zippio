@@ -9,9 +9,7 @@ import net.sf.sevenzipjbinding.SevenZip;
 import net.sf.sevenzipjbinding.SevenZipException;
 import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
@@ -48,9 +46,12 @@ final class PpmdZipSupport {
         }
     }
 
-    static void extract(File file, File destinationDirectory, char[] password) throws Exception {
+    static void extract(File file, File destinationDirectory, char[] password,
+                        ExtractionBudget budget) throws Exception {
         try (ArchiveHandle archive = open(file, password)) {
             int entries = archive.input.getNumberOfItems();
+            if (entries > ExtractionBudget.ENTRY_LIMIT)
+                throw new IOException("展開項目数の上限を超えました。");
             Entry[] archiveEntries = new Entry[entries];
 
             // Validate every destination before the first file is written.
@@ -66,17 +67,13 @@ final class PpmdZipSupport {
 
             String passwordString = passwordString(password);
             for (Entry entry : archiveEntries) {
-                ArchiveEngine.ensureExtractionDirectory(
-                        entry.destination,
-                        entry.name,
-                        entry.directory
-                );
+                budget.entry();
+                if (entry.directory) budget.directory(entry.destination);
                 if (entry.directory) {
                     continue;
                 }
 
-                try (OutputStream output = new BufferedOutputStream(
-                        new FileOutputStream(entry.destination))) {
+                try (OutputStream output = budget.output(entry.destination)) {
                     ExtractOperationResult result = archive.input.extractSlow(
                             entry.index,
                             new OutputStreamAdapter(output),

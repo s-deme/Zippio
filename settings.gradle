@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Zippio"
 include(":app")
+
+include ':sevenzip'
